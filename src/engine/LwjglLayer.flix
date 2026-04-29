@@ -1,0 +1,390 @@
+// LWJGL rendering backend — handles Engine.Game effect with OpenGL (minimal)
+
+mod LwjglLayer {
+    import org.lwjgl.glfw.GLFW
+    import org.lwjgl.glfw.Callbacks
+    import org.lwjgl.opengl.GL
+    import org.lwjgl.opengl.GL11
+    import org.lwjgl.opengl.GL13
+    import org.lwjgl.opengl.GL15
+    import org.lwjgl.opengl.GL20
+    import org.lwjgl.opengl.GL30
+    import org.lwjgl.opengl.GL33
+    import org.lwjgl.stb.STBImage
+    import org.lwjgl.stb.STBTruetype
+    import org.lwjgl.stb.STBTTBakedChar
+    import org.lwjgl.BufferUtils
+    import org.lwjgl.system.MemoryStack
+    import org.lwjgl.system.MemoryUtil
+    import java.lang.System
+    import java.io.FileInputStream
+
+    // ========================================================================
+    // Shader Sources
+    // ========================================================================
+
+    def vertexShaderSource(): String =
+        "#version 330 core\n" +
+        "layout (location = 0) in vec4 vertex;\n" +
+        "out vec2 TexCoords;\n" +
+        "uniform mat4 model;\n" +
+        "uniform mat4 projection;\n" +
+        "uniform vec2 uvOffset;\n" +
+        "uniform vec2 uvScale;\n" +
+        "void main() {\n" +
+        "    TexCoords = vertex.zw * uvScale + uvOffset;\n" +
+        "    gl_Position = projection * model * vec4(vertex.xy, 0.0, 1.0);\n" +
+        "}\n"
+
+    def fragmentShaderSource(): String =
+        "#version 330 core\n" +
+        "in vec2 TexCoords;\n" +
+        "out vec4 color;\n" +
+        "uniform sampler2D image;\n" +
+        "uniform vec3 spriteColor;\n" +
+        "void main() {\n" +
+        "    color = vec4(spriteColor, 1.0) * texture(image, TexCoords);\n" +
+        "}\n"
+
+    // ========================================================================
+    // Shader Compilation
+    // ========================================================================
+
+    def compileShader(source: String, shaderType: Int32): Int32 \ IO =
+        let shader = GL20.glCreateShader(shaderType);
+        GL20.glShaderSource(shader, source);
+        GL20.glCompileShader(shader);
+        let success = GL20.glGetShaderi(shader, GL20.GL_COMPILE_STATUS);
+        if (success == GL11.GL_FALSE) {
+            let log = GL20.glGetShaderInfoLog(shader, 1024);
+            println("Shader compilation error: ${log}");
+            bug!("Shader failed")
+        } else ();
+        shader
+
+    def createShaderProgram(vertexSrc: String, fragmentSrc: String): Int32 \ IO =
+        let vs = compileShader(vertexSrc, GL20.GL_VERTEX_SHADER);
+        let fs = compileShader(fragmentSrc, GL20.GL_FRAGMENT_SHADER);
+        let program = GL20.glCreateProgram();
+        GL20.glAttachShader(program, vs);
+        GL20.glAttachShader(program, fs);
+        GL20.glLinkProgram(program);
+        let success = GL20.glGetProgrami(program, GL20.GL_LINK_STATUS);
+        if (success == GL11.GL_FALSE) {
+            let log = GL20.glGetProgramInfoLog(program, 1024);
+            println("Shader linking error: ${log}");
+            bug!("Linking failed")
+        } else ();
+        GL20.glDeleteShader(vs);
+        GL20.glDeleteShader(fs);
+        program
+
+    // ========================================================================
+    // Texture Loading
+    // ========================================================================
+
+    def loadTexture(path: String, alpha: Bool): Engine.TextureInfo \ IO =
+        let stack = MemoryStack.stackPush();
+        let w = stack.mallocInt(1);
+        let h = stack.mallocInt(1);
+        let c = stack.mallocInt(1);
+        STBImage.stbi_set_flip_vertically_on_load(false);
+        let channels = if (alpha) 4 else 3;
+        let data = STBImage.stbi_load(path, w, h, c, channels);
+        if (Object.isNull(data)) {
+            discard MemoryStack.stackPop();
+            bug!("Failed to load texture: ${path}")
+        } else {
+            let texWidth = w.get(0);
+            let texHeight = h.get(0);
+            let textureID = GL11.glGenTextures();
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureID);
+            let format = if (alpha) GL11.GL_RGBA else GL11.GL_RGB;
+            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, format, texWidth, texHeight, 0, format, GL11.GL_UNSIGNED_BYTE, data);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL11.GL_REPEAT);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL11.GL_REPEAT);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
+            STBImage.stbi_image_free(data);
+            discard MemoryStack.stackPop();
+            { id = textureID, width = Int32.toFloat32(texWidth), height = Int32.toFloat32(texHeight) }
+        }
+
+    def loadTextureRegistry(manifest: List[Engine.TextureEntry]): Engine.TextureRegistry \ IO =
+        List.foldLeft((registry, entry) -> {
+            let texInfo = loadTexture(entry#path, entry#hasAlpha);
+            println("  ${entry#path} loaded (${texInfo#width}x${texInfo#height})");
+            Map.insert(entry#name, texInfo, registry)
+        }, Map.empty(), manifest)
+
+    // ========================================================================
+    // Key Mapping (Engine.Key → GLFW key code)
+    // ========================================================================
+
+    def keyToGlfw(key: Engine.Key): Int32 = match key {
+        case Engine.Key.W     => 87
+        case Engine.Key.A     => 65
+        case Engine.Key.S     => 83
+        case Engine.Key.D     => 68
+        case Engine.Key.Up    => 265
+        case Engine.Key.Down  => 264
+        case Engine.Key.Left  => 263
+        case Engine.Key.Right => 262
+        case Engine.Key.Enter  => 257
+        case Engine.Key.Escape => 256
+    }
+
+    // ========================================================================
+    // Sprite Renderer
+    // ========================================================================
+
+    def initSpriteRenderer(): (Int32, Int32) \ IO =
+        let vao = GL30.glGenVertexArrays();
+        let vbo = GL15.glGenBuffers();
+        let vertices = Array#{
+            0.0f32, 1.0f32, 0.0f32, 1.0f32,
+            1.0f32, 0.0f32, 1.0f32, 0.0f32,
+            0.0f32, 0.0f32, 0.0f32, 0.0f32,
+            0.0f32, 1.0f32, 0.0f32, 1.0f32,
+            1.0f32, 1.0f32, 1.0f32, 1.0f32,
+            1.0f32, 0.0f32, 1.0f32, 0.0f32
+        } @ Static;
+        GL30.glBindVertexArray(vao);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, vbo);
+        GL15.glBufferData(GL15.GL_ARRAY_BUFFER, vertices, GL15.GL_STATIC_DRAW);
+        GL20.glEnableVertexAttribArray(0);
+        GL20.glVertexAttribPointer(0, 4, GL11.GL_FLOAT, false, 16, 0i64);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+        GL30.glBindVertexArray(0);
+        (vao, vbo)
+
+    def setProjectionMatrix(shader: Int32, width: Float32, height: Float32): Unit \ IO =
+        GL20.glUseProgram(shader);
+        let left = 0.0f32;
+        let right = width;
+        let bottom = height;
+        let top = 0.0f32;
+        let proj = Array#{
+            2.0f32 / (right - left), 0.0f32, 0.0f32, 0.0f32,
+            0.0f32, 2.0f32 / (top - bottom), 0.0f32, 0.0f32,
+            0.0f32, 0.0f32, -1.0f32, 0.0f32,
+            -1.0f32 * (right + left) / (right - left), -1.0f32 * (top + bottom) / (top - bottom), 0.0f32, 1.0f32
+        } @ Static;
+        let loc = GL20.glGetUniformLocation(shader, "projection");
+        GL20.glUniformMatrix4fv(loc, false, proj)
+
+    def drawSprite(shader: Int32, texture: Int32, vao: Int32,
+                   pos: Vec2.Vec2, size: Vec2.Vec2, color: Color,
+                   uvOff: Vec2.Vec2, uvSc: Vec2.Vec2, rot: Float32): Unit \ IO =
+        GL20.glUseProgram(shader);
+        let c = Vec2.cos32(rot);
+        let s = Vec2.sin32(rot);
+        let sx = size#x;
+        let sy = size#y;
+        let tx = pos#x + sx / 2.0f32 - c * sx / 2.0f32 + s * sy / 2.0f32;
+        let ty = pos#y + sy / 2.0f32 - s * sx / 2.0f32 - c * sy / 2.0f32;
+        let model = Array#{
+            c * sx, s * sx, 0.0f32, 0.0f32,
+            -1.0f32 * s * sy, c * sy, 0.0f32, 0.0f32,
+            0.0f32, 0.0f32, 1.0f32, 0.0f32,
+            tx, ty, 0.0f32, 1.0f32
+        } @ Static;
+        let modelLoc = GL20.glGetUniformLocation(shader, "model");
+        GL20.glUniformMatrix4fv(modelLoc, false, model);
+        let colorLoc = GL20.glGetUniformLocation(shader, "spriteColor");
+        GL20.glUniform3f(colorLoc, color#r, color#g, color#b);
+        let uvOffsetLoc = GL20.glGetUniformLocation(shader, "uvOffset");
+        GL20.glUniform2f(uvOffsetLoc, uvOff#x, uvOff#y);
+        let uvScaleLoc = GL20.glGetUniformLocation(shader, "uvScale");
+        GL20.glUniform2f(uvScaleLoc, uvSc#x, uvSc#y);
+        GL13.glActiveTexture(GL13.GL_TEXTURE0);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture);
+        GL30.glBindVertexArray(vao);
+        GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 6);
+        GL30.glBindVertexArray(0)
+
+    // ========================================================================
+    // Font Atlas Baking (STBTruetype)
+    // ========================================================================
+
+    def bakeFontAtlas(entry: Engine.FontEntry): (FontAtlas, Engine.TextureInfo) \ IO =
+        let bitmapSize = 512;
+        let charCount = 96;   // ASCII 32-127
+        let firstChar = 32;
+
+        // フォントファイルを ByteBuffer に読み込む
+        let fis = new FileInputStream(entry#path);
+        let fontBytes = fis.readAllBytes();
+        fis.close();
+        let fontBuffer = BufferUtils.createByteBuffer(Array.length(fontBytes));
+        discard fontBuffer.put(fontBytes);
+        discard fontBuffer.flip();
+
+        // STBTruetype でフォントを焼き込む
+        let cdata = STBTTBakedChar.malloc(charCount);
+        let bitmap = BufferUtils.createByteBuffer(bitmapSize * bitmapSize);
+        discard STBTruetype.stbtt_BakeFontBitmap(fontBuffer, entry#fontSize, bitmap, bitmapSize, bitmapSize, firstChar, cdata);
+
+        // GL_RED テクスチャとしてアップロード + swizzle で RGBA 化
+        discard bitmap.position(0);
+        let texId = GL11.glGenTextures();
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, texId);
+        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL30.GL_R8, bitmapSize, bitmapSize, 0, GL11.GL_RED, GL11.GL_UNSIGNED_BYTE, bitmap);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+        // Swizzle: (ONE, ONE, ONE, RED) → 白色テキスト + alpha = グレースケール値
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL33.GL_TEXTURE_SWIZZLE_R, GL11.GL_ONE);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL33.GL_TEXTURE_SWIZZLE_G, GL11.GL_ONE);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL33.GL_TEXTURE_SWIZZLE_B, GL11.GL_ONE);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL33.GL_TEXTURE_SWIZZLE_A, GL11.GL_RED);
+
+        // グリフメトリクスを構築（静的アクセサで各フィールドを取得）
+        let bitmapSizeF = Int32.toFloat32(bitmapSize);
+        let baseAddr = cdata.address();
+        let structSize = 20i64;   // STBTTBakedChar: 4 shorts (8B) + 3 floats (12B) = 20B
+        let glyphs = List.range(0, charCount) |> List.foldLeft((acc, i) -> {
+            let cp = firstChar + i;
+            let addr = baseAddr + Int32.toInt64(i) * structSize;
+            let x0 = Int32.toFloat32(Int16.toInt32(STBTTBakedChar.nx0(addr)));
+            let y0 = Int32.toFloat32(Int16.toInt32(STBTTBakedChar.ny0(addr)));
+            let x1 = Int32.toFloat32(Int16.toInt32(STBTTBakedChar.nx1(addr)));
+            let y1 = Int32.toFloat32(Int16.toInt32(STBTTBakedChar.ny1(addr)));
+            let gm: TextLayout.GlyphMetrics = {
+                xOff = STBTTBakedChar.nxoff(addr),
+                yOff = STBTTBakedChar.nyoff(addr),
+                glyphW = x1 - x0,
+                glyphH = y1 - y0,
+                advance = STBTTBakedChar.nxadvance(addr),
+                s0 = x0 / bitmapSizeF,
+                t0 = y0 / bitmapSizeF,
+                s1 = x1 / bitmapSizeF,
+                t1 = y1 / bitmapSizeF
+            };
+            Map.insert(cp, gm, acc)
+        }, Map.empty());
+
+        cdata.free();
+
+        let texName = "font_${entry#name}";
+        let texInfo: Engine.TextureInfo = { id = texId, width = bitmapSizeF, height = bitmapSizeF };
+        let atlas: FontAtlas = {
+            textureName = texName,
+            fontSize = entry#fontSize,
+            textureSize = bitmapSizeF,
+            glyphs = glyphs
+        };
+        (atlas, texInfo)
+
+    def bakeFontAtlases(manifest: List[Engine.FontEntry],
+                        registry: Engine.TextureRegistry): (Map[String, FontAtlas], Engine.TextureRegistry) \ IO =
+        List.foldLeft((acc, entry) -> {
+            let (atlases, reg) = acc;
+            let (atlas, texInfo) = bakeFontAtlas(entry);
+            println("  Font '${entry#name}' baked (${atlas#textureName})");
+            let newAtlases = Map.insert(entry#name, atlas, atlases);
+            let newReg = Map.insert(atlas#textureName, texInfo, reg);
+            (newAtlases, newReg)
+        }, (Map.empty(), registry), manifest)
+
+    // ========================================================================
+    // LWJGL Handler for Engine.Game effect
+    // ========================================================================
+
+    pub def withLwjgl(config: Engine.EngineConfig, f: Unit -> a \ ef): a \ ef - Engine.Game + IO =
+        if (not GLFW.glfwInit()) {
+            println("GLFW init failed");
+            bug!("GLFW failed")
+        } else ();
+
+        GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MAJOR, 3);
+        GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MINOR, 3);
+        GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE);
+        GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GL11.GL_TRUE);
+        GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GL11.GL_FALSE);
+
+        let window = GLFW.glfwCreateWindow(config#screenWidth, config#screenHeight, config#title, MemoryUtil.NULL, MemoryUtil.NULL);
+        GLFW.glfwMakeContextCurrent(window);
+        GLFW.glfwSwapInterval(1);
+        discard GL.createCapabilities();
+
+        let fbStack = MemoryStack.stackPush();
+        let fbWidthBuf = fbStack.mallocInt(1);
+        let fbHeightBuf = fbStack.mallocInt(1);
+        GLFW.glfwGetFramebufferSize(window, fbWidthBuf, fbHeightBuf);
+        let fbWidth = fbWidthBuf.get(0);
+        let fbHeight = fbHeightBuf.get(0);
+        discard MemoryStack.stackPop();
+        println("Framebuffer size: ${fbWidth}x${fbHeight}");
+
+        GL11.glViewport(0, 0, fbWidth, fbHeight);
+        GL11.glEnable(GL11.GL_BLEND);
+        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+
+        let screenW = Int32.toFloat32(config#screenWidth);
+        let screenH = Int32.toFloat32(config#screenHeight);
+
+        let shader = createShaderProgram(vertexShaderSource(), fragmentShaderSource());
+        setProjectionMatrix(shader, screenW, screenH);
+
+        let (vao, _vbo) = initSpriteRenderer();
+
+        println("Loading textures...");
+        let registry0 = loadTextureRegistry(config#textureManifest);
+
+        println("Baking font atlases...");
+        let (fontAtlases, registry) = bakeFontAtlases(config#fontManifest, registry0);
+
+        let timeHolder = Array#{System.nanoTime()} @ Static;
+
+        let result = run {
+            f()
+        } with handler Engine.Game {
+            def render(drawables, k) = {
+                GL11.glClearColor(config#clearColor#r, config#clearColor#g, config#clearColor#b, 1.0f32);
+                GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
+                List.forEach(d -> {
+                    match Map.get(d#texture, registry) {
+                        case Some(texInfo) =>
+                            let displayW = texInfo#width * d#scale#x;
+                            let displayH = texInfo#height * d#scale#y;
+                            let displaySize: Vec2.Vec2 = {x = displayW, y = displayH};
+                            let pos: Vec2.Vec2 = if (d#centered)
+                                {x = d#position#x - displayW / 2.0f32, y = d#position#y - displayH / 2.0f32}
+                            else
+                                d#position;
+                            drawSprite(shader, texInfo#id, vao, pos, displaySize, d#color, d#uvOffset, d#uvScale, d#rotation)
+                        case None => ()
+                    }
+                }, drawables);
+                GLFW.glfwSwapBuffers(window);
+                k(())
+            }
+            def shouldClose(k) = {
+                GLFW.glfwPollEvents();
+                k(GLFW.glfwWindowShouldClose(window))
+            }
+            def getDeltaTime(k) = {
+                let currentTime = System.nanoTime();
+                let prev = Array.get(0, timeHolder);
+                Array.put(currentTime, 0, timeHolder);
+                let dtNanos = currentTime - prev;
+                let dtf = Int64.toFloat32(dtNanos) / 1000000000.0f32;
+                k(dtf)
+            }
+            def isKeyPressed(key, k) = {
+                let code = keyToGlfw(key);
+                k(GLFW.glfwGetKey(window, code) == 1)
+            }
+            def getFontAtlas(name, k) = {
+                match Map.get(name, fontAtlases) {
+                    case Some(atlas) => k(atlas)
+                    case None => bug!("Font atlas not found: ${name}")
+                }
+            }
+        };
+
+        Callbacks.glfwFreeCallbacks(window);
+        GLFW.glfwDestroyWindow(window);
+        GLFW.glfwTerminate();
+        result
+}
