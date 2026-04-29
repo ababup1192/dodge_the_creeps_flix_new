@@ -2,7 +2,7 @@
 
 /// ゲーム固有の状態データ
 pub enum GameData {
-    case PlayerData
+    case PlayerData({velocity = Vec2.Vec2})
     case StaticData
 }
 
@@ -13,6 +13,15 @@ pub type alias GameState = {
 // ── Node 実装 ──
 
 instance Node[GameData] {
+    redef process(delta: Float64, node: EngineNode[GameData],
+                    _path: NodePath, scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) =
+        let dt = Float64.truncateToFloat32(delta);
+        match node {
+            case EngineNode.AnimSprite2DWithState(sprite, GameData.PlayerData(r)) =>
+                let moved = PlayerScene.movePlayer(dt, sprite, r);
+                (EngineNode.AnimSprite2DWithState(moved, GameData.PlayerData(r)), scene)
+            case _ => (node, scene)
+        }
 }
 
 // ── AreaHandler 実装 ──
@@ -35,35 +44,29 @@ mod Game {
     pub def screenHi(): Int32 = 720
 
     // ========================================================================
-    // プレイヤー定数
-    // ========================================================================
-
-    /// プレイヤー初期位置（画面中央）
-    pub def playerStart(): Vec2.Vec2 = {x = 240.0f32, y = 360.0f32}
-
-    /// プレイヤーのアニメーション定義
-    pub def playerAnimations(): Map[String, List[String]] =
-        Map#{
-            "walk" => ("playerGrey_walk1" :: "playerGrey_walk2" :: Nil),
-            "up" => ("playerGrey_up1" :: "playerGrey_up2" :: Nil)
-        }
-
-    // ========================================================================
     // 初期状態構築
     // ========================================================================
 
     pub def buildState(_fontAtlas: FontAtlas): GameState =
-        let scene = Scene.empty()
-            |> Scene.addNode("player",
-                EngineNode.AnimSprite2DWithState(
-                    AnimatedSprite2D.make(
-                        playerAnimations(),
-                        initialAnimation = "walk",
-                        fps = 6.0f32,
-                        playerStart(),
-                        {x = 1.0f32, y = 1.0f32}),
-                    GameData.PlayerData));
-        { scene = scene }
+        { scene = Scene.empty() |> PlayerScene.addPlayer }
+
+    // ========================================================================
+    // 入力
+    // ========================================================================
+
+    /// WASD / 矢印キーから方向ベクトルを返す
+    pub def readInputDirection(): Vec2.Vec2 \ Engine.Game =
+        let xDir =
+            (if (Engine.Game.isKeyPressed(Engine.Key.D))      1.0f32 else 0.0f32) +
+            (if (Engine.Game.isKeyPressed(Engine.Key.Right))   1.0f32 else 0.0f32) +
+            (if (Engine.Game.isKeyPressed(Engine.Key.A))      -1.0f32 else 0.0f32) +
+            (if (Engine.Game.isKeyPressed(Engine.Key.Left))   -1.0f32 else 0.0f32);
+        let yDir =
+            (if (Engine.Game.isKeyPressed(Engine.Key.S))      1.0f32 else 0.0f32) +
+            (if (Engine.Game.isKeyPressed(Engine.Key.Down))    1.0f32 else 0.0f32) +
+            (if (Engine.Game.isKeyPressed(Engine.Key.W))      -1.0f32 else 0.0f32) +
+            (if (Engine.Game.isKeyPressed(Engine.Key.Up))     -1.0f32 else 0.0f32);
+        {x = xDir, y = yDir}
 
     // ========================================================================
     // メインループ
@@ -77,7 +80,11 @@ mod Game {
         else if (Engine.Game.isKeyPressed(Engine.Key.Escape)) ()
         else {
             let dt = Engine.Game.getDeltaTime();
-            { scene = GameEngine.update(dt, false, state#scene) | state }
+            let dir = readInputDirection();
+            { scene = state#scene
+                |> PlayerScene.applyInput(dir)
+                |> GameEngine.update(dt, false)
+              | state }
                 |> gameLoop(fontAtlas)
         }
 }
