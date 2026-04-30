@@ -43,8 +43,6 @@ mod Game {
     // 画面定数
     // ========================================================================
 
-    pub def screenW(): Float32 = 480.0f32
-    pub def screenH(): Float32 = 720.0f32
     pub def screenWi(): Int32 = 480
     pub def screenHi(): Int32 = 720
 

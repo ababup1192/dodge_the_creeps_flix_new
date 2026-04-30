@@ -44,7 +44,7 @@ mod PlayerScene {
                     fps = 6.0f32,
                 start(),
                     {x = 1.0f32, y = 1.0f32}),
-                GameData.Player({velocity = Vec2.zero(), screenSize = {x = Game.screenW(), y = Game.screenH()}})),
+                GameData.Player({velocity = Vec2.zero(), screenSize = Vec2.zero()})),
             scene)
 
     // ========================================================================

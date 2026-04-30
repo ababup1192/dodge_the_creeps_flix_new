@@ -39,6 +39,10 @@ def testScene(): Scene[GameData] = Game.buildState(testFontAtlas())#scene
 /// テスト用ヘルパー: buildState を取得
 def testState(): GameState = Game.buildState(testFontAtlas())
 
+/// テスト用ヘルパー: readyAll 済みのシーンを取得（screenSize が設定される）
+def testReadyScene(): Scene[GameData] =
+    withMockEngine(() -> Scene.readyAll(testScene()))
+
 /// Vec2 をタプルに変換するヘルパー
 def vecToTuple(v: Vec2.Vec2): (Float32, Float32) = (v#x, v#y)
 
@@ -261,7 +265,7 @@ def testApplyInputUpRotation(): Unit \ Assert =
 ///   speed=400, dt=0.1 → 右に40px 移動: 240+40=280
 @Test
 def testPlayerProcessMoves(): Unit \ Assert =
-    let scene = testScene()
+    let scene = testReadyScene()
         |> Scene.mapState("player" :: Nil, state ->
             match state {
                 case GameData.Player(playerData) =>
@@ -273,25 +277,25 @@ def testPlayerProcessMoves(): Unit \ Assert =
 /// 速度ゼロのとき process で移動しない
 @Test
 def testPlayerProcessStays(): Unit \ Assert =
-    let pos = testScene() |> Scene.processAll(0.1, false) |> Scene.globalPosition("player");
+    let pos = testReadyScene() |> Scene.processAll(0.1, false) |> Scene.globalPosition("player");
     Assert.assertEq(expected = (240.0f32, 360.0f32), vecToTuple(pos))
 
 /// 画面右端でクランプされる
 @Test
 def testPlayerClampRight(): Unit \ Assert =
-    let scene = testScene()
+    let scene = testReadyScene()
         |> Scene.mapState("player" :: Nil, state ->
             match state {
                 case GameData.Player(playerData) =>
                     GameData.Player({velocity = {x = 400.0f32, y = 0.0f32} | playerData})
             });
     let pos = scene |> Scene.processAll(1.0, false) |> Scene.globalPosition("player");
-    Assert.assertEq(expected = (Game.screenW(), 360.0f32), vecToTuple(pos))
+    Assert.assertEq(expected = (480.0f32, 360.0f32), vecToTuple(pos))
 
 /// 画面左端でクランプされる
 @Test
 def testPlayerClampLeft(): Unit \ Assert =
-    let scene = testScene()
+    let scene = testReadyScene()
         |> Scene.mapState("player" :: Nil, state ->
             match state {
                 case GameData.Player(playerData) =>
