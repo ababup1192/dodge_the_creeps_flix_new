@@ -2,27 +2,32 @@
 
 mod PlayerScene {
 
+    pub type alias PlayerData = {velocity = Vec2.Vec2}
+
     // ========================================================================
     // 定数
     // ========================================================================
 
     /// プレイヤーノード名
-    pub def playerName(): String = "player"
+    def name(): String = "player"
 
     /// プレイヤー初期位置（画面中央）
-    pub def playerStart(): Vec2.Vec2 = {x = 240.0f32, y = 360.0f32}
+    def start(): Vec2.Vec2 = {x = 240.0f32, y = 360.0f32}
 
     /// プレイヤー移動速度（px/秒）
-    pub def playerSpeed(): Float32 = 400.0f32
+    def speed(): Float32 = 400.0f32
 
     /// π（円周率）
     def pi(): Float64 = 3.14159265358979
 
+    def walkAnimation(): String = "walk"
+    def upAnimation(): String = "up"
+
     /// プレイヤーのアニメーション定義
-    pub def playerAnimations(): Map[String, List[String]] =
+    def playerAnimations(): Map[String, List[String]] =
         Map#{
-            "walk" => ("playerGrey_walk1" :: "playerGrey_walk2" :: Nil),
-            "up" => ("playerGrey_up1" :: "playerGrey_up2" :: Nil)
+            walkAnimation() => ("playerGrey_walk1" :: "playerGrey_walk2" :: Nil),
+            upAnimation() => ("playerGrey_up1" :: "playerGrey_up2" :: Nil)
         }
 
     // ========================================================================
@@ -31,29 +36,43 @@ mod PlayerScene {
 
     /// プレイヤーノードをシーンに追加する
     pub def addPlayer(scene: Scene[GameData]): Scene[GameData] =
-        Scene.addNode(playerName(),
+        Scene.addNode(name(),
             EngineNode.AnimSprite2DWithState(
                 AnimatedSprite2D.make(
                     playerAnimations(),
-                    initialAnimation = "walk",
+                    initialAnimation = walkAnimation(),
                     fps = 6.0f32,
-                    playerStart(),
+                start(),
                     {x = 1.0f32, y = 1.0f32}),
-                GameData.PlayerData({velocity = Vec2.zero()})),
+                GameData.Player({velocity = Vec2.zero()})),
             scene)
 
     // ========================================================================
-    // 毎フレーム移動（Node.process から呼ばれる）
+    // 毎フレーム処理（Node.process から委譲される）
+    // ========================================================================
+
+    /// プレイヤーノードの毎フレーム処理
+    pub def process(delta: Float64, sprite: AnimatedSprite2D,
+                    r: {velocity = Vec2.Vec2},
+                    scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) =
+        let dt = Float64.truncateToFloat32(delta);
+        let moved = movePlayer(dt, {x = Game.screenW(), y = Game.screenH()}, sprite, r);
+        (EngineNode.AnimSprite2DWithState(moved, GameData.Player(r)), scene)
+
+    // ========================================================================
+    // 移動
     // ========================================================================
 
     /// 速度に応じてプレイヤーを移動し、画面範囲にクランプする
-    pub def movePlayer(dt: Float32, sprite: AnimatedSprite2D,
+    pub def movePlayer(dt: Float32, screenSize: Vec2.Vec2,
+                       sprite: AnimatedSprite2D,
                        r: {velocity = Vec2.Vec2}): AnimatedSprite2D =
         let pos = Node2D.getPosition(sprite);
         let newPos = Vec2.clamp(
             Vec2.add(pos, Vec2.mul(r#velocity, dt)),
             Vec2.zero(),
-            {x = Game.screenW(), y = Game.screenH()});
+            screenSize
+        );
         Node2D.setPosition(newPos, sprite)
 
     // ========================================================================
@@ -63,13 +82,13 @@ mod PlayerScene {
     /// 方向ベクトルに応じてプレイヤーの速度とアニメーションを更新する
     pub def applyInput(dir: Vec2.Vec2, scene: Scene[GameData]): Scene[GameData] =
         let velocity = if (Vec2.length(dir) > 0.0f32)
-                Vec2.mul(Vec2.normalized(dir), playerSpeed())
+                Vec2.mul(Vec2.normalized(dir), speed())
             else
                 Vec2.zero();
         scene
-            |> Scene.mapState(playerName() :: Nil, _ ->
-                GameData.PlayerData({velocity = velocity}))
-            |> Scene.mapEngineNode(playerName() :: Nil,
+            |> Scene.mapState(name() :: Nil, _ ->
+                GameData.Player({velocity = velocity}))
+            |> Scene.mapEngineNode(name() :: Nil,
                 EngineNode.mapAnimSprite2D(setPlayerAnimation(dir)))
 
     // ========================================================================
@@ -98,12 +117,12 @@ mod PlayerScene {
     /// 本家 Godot 準拠: 横移動は walk + flipH + flipV=false、縦移動は up + rotation（下向きで PI）
     pub def setPlayerAnimation(dir: Vec2.Vec2, sprite: AnimatedSprite2D): AnimatedSprite2D =
         if (dir#x != 0.0f32)
-            sprite |> switchAnim("walk")
+            sprite |> switchAnim(walkAnimation())
                    |> setFlipV(false)
                    |> setFlipH(dir#x < 0.0f32)
                    |> Node2D.setRotation(0.0)
         else if (dir#y != 0.0f32)
-            sprite |> switchAnim("up")
+            sprite |> switchAnim(upAnimation())
                    |> Node2D.setRotation(if (dir#y > 0.0f32) pi() else 0.0)
         else
             AnimatedSprite2D.stop(sprite)

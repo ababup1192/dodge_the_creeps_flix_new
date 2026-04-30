@@ -2,8 +2,7 @@
 
 /// ゲーム固有の状態データ
 pub enum GameData {
-    case PlayerData({velocity = Vec2.Vec2})
-    case StaticData
+    case Player(PlayerScene.PlayerData)
 }
 
 pub type alias GameState = {
@@ -15,11 +14,9 @@ pub type alias GameState = {
 instance Node[GameData] {
     redef process(delta: Float64, node: EngineNode[GameData],
                     _path: NodePath, scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) =
-        let dt = Float64.truncateToFloat32(delta);
         match node {
-            case EngineNode.AnimSprite2DWithState(sprite, GameData.PlayerData(r)) =>
-                let moved = PlayerScene.movePlayer(dt, sprite, r);
-                (EngineNode.AnimSprite2DWithState(moved, GameData.PlayerData(r)), scene)
+            case EngineNode.AnimSprite2DWithState(sprite, GameData.Player(r)) =>
+                PlayerScene.process(delta, sprite, r, scene)
             case _ => (node, scene)
         }
 }
@@ -57,7 +54,7 @@ mod Game {
     /// WASD / 矢印キーから方向ベクトルを返す
     pub def readInputDirection(): Vec2.Vec2 \ Engine.Game =
         let xDir =
-            (if (Engine.Game.isKeyPressed(Engine.Key.D))      1.0f32 else 0.0f32) +
+            (if (Engine.Game.isKeyPressed(Engine.Key.D))      1.0f32 else 0f32) +
             (if (Engine.Game.isKeyPressed(Engine.Key.Right))   1.0f32 else 0.0f32) +
             (if (Engine.Game.isKeyPressed(Engine.Key.A))      -1.0f32 else 0.0f32) +
             (if (Engine.Game.isKeyPressed(Engine.Key.Left))   -1.0f32 else 0.0f32);

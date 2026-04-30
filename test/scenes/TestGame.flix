@@ -88,7 +88,7 @@ def testPlayerWalkAnimation(): Unit \ Assert =
 @Test
 def testPlayerInitialVelocity(): Unit \ Assert =
     match Scene.get("player", testScene()) {
-        case Some(GameData.PlayerData(r)) =>
+        case Some(GameData.Player(r)) =>
             Assert.assertEq(expected = (0.0f32, 0.0f32), vecToTuple(r#velocity))
         case _ => bug!("player state mismatch")
     }
@@ -164,7 +164,7 @@ def testInputDirectionNone(): Unit \ Assert =
 def testApplyInputSetsVelocity(): Unit \ Assert =
     let scene = PlayerScene.applyInput({x = 1.0f32, y = 0.0f32}, testScene());
     match Scene.get("player", scene) {
-        case Some(GameData.PlayerData(r)) =>
+        case Some(GameData.Player(r)) =>
             Assert.assertEq(expected = (400.0f32, 0.0f32), vecToTuple(r#velocity))
         case _ => bug!("player state mismatch")
     }
@@ -174,7 +174,7 @@ def testApplyInputSetsVelocity(): Unit \ Assert =
 def testApplyInputZeroVelocity(): Unit \ Assert =
     let scene = PlayerScene.applyInput(Vec2.zero(), testScene());
     match Scene.get("player", scene) {
-        case Some(GameData.PlayerData(r)) =>
+        case Some(GameData.Player(r)) =>
             Assert.assertEq(expected = (0.0f32, 0.0f32), vecToTuple(r#velocity))
         case _ => bug!("player state mismatch")
     }
@@ -261,7 +261,7 @@ def testApplyInputUpRotation(): Unit \ Assert =
 def testPlayerProcessMoves(): Unit \ Assert =
     let scene = testScene()
         |> Scene.mapState("player" :: Nil, _ ->
-            GameData.PlayerData({velocity = {x = 400.0f32, y = 0.0f32}}));
+            GameData.Player({velocity = {x = 400.0f32, y = 0.0f32}}));
     let pos = scene |> Scene.processAll(0.1, false) |> Scene.globalPosition("player");
     Assert.assertEq(expected = (280.0f32, 360.0f32), vecToTuple(pos))
 
@@ -276,16 +276,16 @@ def testPlayerProcessStays(): Unit \ Assert =
 def testPlayerClampRight(): Unit \ Assert =
     let scene = testScene()
         |> Scene.mapState("player" :: Nil, _ ->
-            GameData.PlayerData({velocity = {x = 400.0f32, y = 0.0f32}}));
+            GameData.Player({velocity = {x = 400.0f32, y = 0.0f32}}));
     let pos = scene |> Scene.processAll(1.0, false) |> Scene.globalPosition("player");
-    Assert.assertEq(expected = (480.0f32, 360.0f32), vecToTuple(pos))
+    Assert.assertEq(expected = (Game.screenW(), 360.0f32), vecToTuple(pos))
 
 /// 画面左端でクランプされる
 @Test
 def testPlayerClampLeft(): Unit \ Assert =
     let scene = testScene()
         |> Scene.mapState("player" :: Nil, _ ->
-            GameData.PlayerData({velocity = {x = -400.0f32, y = 0.0f32}}));
+            GameData.Player({velocity = {x = -400.0f32, y = 0.0f32}}));
     let pos = scene |> Scene.processAll(1.0, false) |> Scene.globalPosition("player");
     Assert.assertEq(expected = (0.0f32, 360.0f32), vecToTuple(pos))
 

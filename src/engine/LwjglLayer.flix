@@ -3,6 +3,7 @@
 mod LwjglLayer {
     import org.lwjgl.glfw.GLFW
     import org.lwjgl.glfw.Callbacks
+    import org.lwjgl.glfw.GLFWFramebufferSizeCallbackI
     import org.lwjgl.opengl.GL
     import org.lwjgl.opengl.GL11
     import org.lwjgl.opengl.GL13
@@ -204,6 +205,63 @@ mod LwjglLayer {
         GL30.glBindVertexArray(0)
 
     // ========================================================================
+    // Viewport Calculation (Stretch Mode)
+    // ========================================================================
+
+    /// デザイン解像度のアスペクト比を維持しつつ、フレームバッファに収まる最大矩形を計算する。
+    /// 戻り値: (vpX, vpY, vpW, vpH)
+    def calcViewport(fbW: Int32, fbH: Int32, designW: Float32, designH: Float32): (Int32, Int32, Int32, Int32) =
+        let designAspect = designW / designH;
+        let windowAspect = Int32.toFloat32(fbW) / Int32.toFloat32(fbH);
+        if (windowAspect > designAspect) {
+            // ピラーボックス（左右黒帯）
+            let vpH = fbH;
+            let vpW = Vec2.floatToInt32(Int32.toFloat32(fbH) * designAspect);
+            let vpX = (fbW - vpW) / 2;
+            (vpX, 0, vpW, vpH)
+        } else {
+            // レターボックス（上下黒帯）
+            let vpW = fbW;
+            let vpH = Vec2.floatToInt32(Int32.toFloat32(fbW) / designAspect);
+            let vpY = (fbH - vpH) / 2;
+            (0, vpY, vpW, vpH)
+        }
+
+    /// ビューポート計算・レターボックス処理を含むフレーム描画処理。
+    /// render ハンドラとリサイズコールバックの両方から呼ばれる。
+    def renderFrame(shader: Int32, vao: Int32, registry: Engine.TextureRegistry,
+                    clearColor: Color, designW: Float32, designH: Float32,
+                    fbW: Int32, fbH: Int32, drawables: List[Engine.Drawable]): Unit \ IO =
+        if (fbW > 0 and fbH > 0) {
+            let (vpX, vpY, vpW, vpH) = calcViewport(fbW, fbH, designW, designH);
+            // フレームバッファ全体を黒でクリア（レターボックス/ピラーボックス領域）
+            GL11.glViewport(0, 0, fbW, fbH);
+            GL11.glClearColor(0.0f32, 0.0f32, 0.0f32, 1.0f32);
+            GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
+            // ゲーム領域にビューポートを設定
+            GL11.glViewport(vpX, vpY, vpW, vpH);
+            GL11.glEnable(GL11.GL_SCISSOR_TEST);
+            GL11.glScissor(vpX, vpY, vpW, vpH);
+            GL11.glClearColor(clearColor#r, clearColor#g, clearColor#b, 1.0f32);
+            GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
+            GL11.glDisable(GL11.GL_SCISSOR_TEST);
+            List.forEach(drawable -> {
+                match Map.get(drawable#texture, registry) {
+                    case Some(texInfo) =>
+                        let displayW = texInfo#width * drawable#scale#x;
+                        let displayH = texInfo#height * drawable#scale#y;
+                        let displaySize: Vec2.Vec2 = {x = displayW, y = displayH};
+                        let pos: Vec2.Vec2 = if (drawable#centered)
+                            {x = drawable#position#x - displayW / 2.0f32, y = drawable#position#y - displayH / 2.0f32}
+                        else
+                            drawable#position;
+                        drawSprite(shader, texInfo#id, vao, pos, displaySize, drawable#color, drawable#uvOffset, drawable#uvScale, drawable#rotation)
+                    case None => ()
+                }
+            }, drawables)
+        } else ()
+
+    // ========================================================================
     // Font Atlas Baking (STBTruetype)
     // ========================================================================
 
@@ -300,7 +358,7 @@ mod LwjglLayer {
         GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MINOR, 3);
         GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE);
         GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GL11.GL_TRUE);
-        GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GL11.GL_FALSE);
+        GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GL11.GL_TRUE);
 
         let window = GLFW.glfwCreateWindow(config#screenWidth, config#screenHeight, config#title, MemoryUtil.NULL, MemoryUtil.NULL);
         GLFW.glfwMakeContextCurrent(window);
@@ -316,7 +374,6 @@ mod LwjglLayer {
         discard MemoryStack.stackPop();
         println("Framebuffer size: ${fbWidth}x${fbHeight}");
 
-        GL11.glViewport(0, 0, fbWidth, fbHeight);
         GL11.glEnable(GL11.GL_BLEND);
         GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
 
@@ -336,26 +393,32 @@ mod LwjglLayer {
 
         let timeHolder = Array#{System.nanoTime()} @ Static;
 
+        // リサイズ中の再描画用に最後のフレームの描画リストを保持する
+        let drawablesHolder = Array#{(Nil: List[Engine.Drawable])} @ Static;
+
+        // macOS ではリサイズ中に glfwPollEvents がブロックされるため、
+        // フレームバッファサイズ変更コールバックで再描画を行う
+        discard GLFW.glfwSetFramebufferSizeCallback(window, new GLFWFramebufferSizeCallbackI {
+            def invoke(_this: GLFWFramebufferSizeCallbackI, cbWindow: Int64, width: Int32, height: Int32): Unit \ IO = {
+                renderFrame(shader, vao, registry, config#clearColor, screenW, screenH,
+                            width, height, Array.get(0, drawablesHolder));
+                GLFW.glfwSwapBuffers(cbWindow)
+            }
+        });
+
         let result = run {
             f()
         } with handler Engine.Game {
             def render(drawables, k) = {
-                GL11.glClearColor(config#clearColor#r, config#clearColor#g, config#clearColor#b, 1.0f32);
-                GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
-                List.forEach(d -> {
-                    match Map.get(d#texture, registry) {
-                        case Some(texInfo) =>
-                            let displayW = texInfo#width * d#scale#x;
-                            let displayH = texInfo#height * d#scale#y;
-                            let displaySize: Vec2.Vec2 = {x = displayW, y = displayH};
-                            let pos: Vec2.Vec2 = if (d#centered)
-                                {x = d#position#x - displayW / 2.0f32, y = d#position#y - displayH / 2.0f32}
-                            else
-                                d#position;
-                            drawSprite(shader, texInfo#id, vao, pos, displaySize, d#color, d#uvOffset, d#uvScale, d#rotation)
-                        case None => ()
-                    }
-                }, drawables);
+                Array.put(drawables, 0, drawablesHolder);
+                let stack = MemoryStack.stackPush();
+                let wBuf = stack.mallocInt(1);
+                let hBuf = stack.mallocInt(1);
+                GLFW.glfwGetFramebufferSize(window, wBuf, hBuf);
+                let fbW = wBuf.get(0);
+                let fbH = hBuf.get(0);
+                discard MemoryStack.stackPop();
+                renderFrame(shader, vao, registry, config#clearColor, screenW, screenH, fbW, fbH, drawables);
                 GLFW.glfwSwapBuffers(window);
                 k(())
             }
