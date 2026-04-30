@@ -41,7 +41,7 @@ def testScreenNotifyKeepOnScreen(): Unit \ Assert =
     let scene: Scene[TestScreenState] = Scene.empty()
         |> trackedNode("a", 100.0, 100.0)
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 200.0, screenHeight = 200.0);
+            screenWidth = 200, screenHeight = 200);
     Assert.assertTrue(not Option.isEmpty(Scene.getEngineNode("a" :: Nil, scene)))
 
 /// 画面外のノードでも初回（prevOnScreen 未登録）は削除されない
@@ -50,7 +50,7 @@ def testScreenNotifyKeepFirstFrameOffScreen(): Unit \ Assert =
     let scene: Scene[TestScreenState] = Scene.empty()
         |> trackedNode("a", 300.0, 300.0)
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 200.0, screenHeight = 200.0);
+            screenWidth = 200, screenHeight = 200);
     Assert.assertTrue(not Option.isEmpty(Scene.getEngineNode("a" :: Nil, scene)))
 
 /// 画面内 → 画面外でノードが削除される（screen_exited 相当）
@@ -63,11 +63,11 @@ def testScreenNotifyRemovesExitedNode(): Unit \ Assert =
     let scene1: Scene[TestScreenState] = Scene.empty()
         |> trackedNode("a", 100.0, 100.0)
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 200.0, screenHeight = 200.0);
+            screenWidth = 200, screenHeight = 200);
     // フレーム2: 画面外に移動
     let scene2 = Scene.setGlobalPosition("a", {x = 300.0, y = 300.0}, scene1)
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 200.0, screenHeight = 200.0);
+            screenWidth = 200, screenHeight = 200);
     Assert.assertTrue(Option.isEmpty(Scene.getEngineNode("a" :: Nil, scene2)))
 
 // ========================================================================
@@ -82,11 +82,11 @@ def testScreenNotifySelectiveRemoval(): Unit \ Assert =
         |> trackedNode("a", 50.0, 50.0)
         |> trackedNode("b", 150.0, 150.0)
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 200.0, screenHeight = 200.0);
+            screenWidth = 200, screenHeight = 200);
     // フレーム2: "a" は画面内のまま、"b" を画面外に移動
     let scene2 = Scene.setGlobalPosition("b", {x = 300.0, y = 300.0}, scene1)
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 200.0, screenHeight = 200.0);
+            screenWidth = 200, screenHeight = 200);
     let aExists = not Option.isEmpty(Scene.getEngineNode("a" :: Nil, scene2));
     let bExists = not Option.isEmpty(Scene.getEngineNode("b" :: Nil, scene2));
     Assert.assertEq(expected = (true, false), (aExists, bExists))
@@ -102,11 +102,11 @@ def testScreenNotifyIgnoresUntrackedNode(): Unit \ Assert =
     let scene1: Scene[TestScreenState] = Scene.empty()
         |> Scene.addNode("a", untrackedNode(100.0, 100.0))
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 200.0, screenHeight = 200.0);
+            screenWidth = 200, screenHeight = 200);
     // フレーム2: 画面外に移動しても削除されない
     let scene2 = Scene.setGlobalPosition("a", {x = 300.0, y = 300.0}, scene1)
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 200.0, screenHeight = 200.0);
+            screenWidth = 200, screenHeight = 200);
     Assert.assertTrue(not Option.isEmpty(Scene.getEngineNode("a" :: Nil, scene2)))
 
 // ========================================================================
@@ -119,7 +119,7 @@ def testScreenNotifyUpdatesPrevOnScreen(): Unit \ Assert =
     let scene: Scene[TestScreenState] = Scene.empty()
         |> trackedNode("a", 100.0, 100.0)
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 200.0, screenHeight = 200.0);
+            screenWidth = 200, screenHeight = 200);
     Assert.assertTrue(Set.memberOf("a" :: Nil, Scene.getPrevOnScreen(scene)))
 
 /// 画面外ノードは prevOnScreen に登録されない
@@ -128,7 +128,7 @@ def testScreenNotifyDoesNotTrackOffScreen(): Unit \ Assert =
     let scene: Scene[TestScreenState] = Scene.empty()
         |> trackedNode("a", 300.0, 300.0)
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 200.0, screenHeight = 200.0);
+            screenWidth = 200, screenHeight = 200);
     Assert.assertFalse(Set.memberOf("a" :: Nil, Scene.getPrevOnScreen(scene)))
 
 /// 削除されたノードは prevOnScreen からも消える
@@ -138,9 +138,9 @@ def testScreenNotifyRemovedNodeClearedFromPrevOnScreen(): Unit \ Assert =
     let scene1: Scene[TestScreenState] = Scene.empty()
         |> trackedNode("a", 100.0, 100.0)
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 200.0, screenHeight = 200.0);
+            screenWidth = 200, screenHeight = 200);
     // フレーム2: 画面外 → 削除
     let scene2 = Scene.setGlobalPosition("a", {x = 300.0, y = 300.0}, scene1)
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 200.0, screenHeight = 200.0);
+            screenWidth = 200, screenHeight = 200);
     Assert.assertFalse(Set.memberOf("a" :: Nil, Scene.getPrevOnScreen(scene2)))

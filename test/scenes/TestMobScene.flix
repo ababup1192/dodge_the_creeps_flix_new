@@ -91,7 +91,7 @@ def testMobSceneKeepOnScreenMob(): Unit \ Assert =
     let scene = Scene.empty()
         |> MobScene.spawnMob("mob_0", {x = 240.0, y = 360.0})
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 480.0, screenHeight = 720.0);
+            screenWidth = 480, screenHeight = 720);
     Assert.assertTrue(not Option.isEmpty(Scene.getEngineNode("mob_0" :: Nil, scene)))
 
 /// 画面上部にいるスポーン直後の Mob は削除されない（prevOnScreen 未登録）
@@ -103,7 +103,7 @@ def testMobSceneKeepSpawnedMobAboveScreen(): Unit \ Assert =
     let scene = Scene.empty()
         |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0})
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 480.0, screenHeight = 720.0);
+            screenWidth = 480, screenHeight = 720);
     Assert.assertTrue(not Option.isEmpty(Scene.getEngineNode("mob_0" :: Nil, scene)))
 
 /// 画面内→画面外で Mob が削除される（screen_exited 相当）
@@ -117,11 +117,11 @@ def testMobSceneRemoveExitedMob(): Unit \ Assert =
     let scene1 = Scene.empty()
         |> MobScene.spawnMob("mob_0", {x = 240.0, y = 360.0})
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 480.0, screenHeight = 720.0);
+            screenWidth = 480, screenHeight = 720);
     // フレーム2: 画面外に移動
     let scene2 = Scene.setGlobalPosition("mob_0", {x = 240.0, y = 800.0}, scene1)
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 480.0, screenHeight = 720.0);
+            screenWidth = 480, screenHeight = 720);
     Assert.assertTrue(Option.isEmpty(Scene.getEngineNode("mob_0" :: Nil, scene2)))
 
 /// Mob 削除時にスプライト子ノードも一緒に削除される
@@ -130,10 +130,10 @@ def testMobSceneRemoveAlsoRemovesChildren(): Unit \ Assert =
     let scene1 = Scene.empty()
         |> MobScene.spawnMob("mob_0", {x = 240.0, y = 360.0})
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 480.0, screenHeight = 720.0);
+            screenWidth = 480, screenHeight = 720);
     let scene2 = Scene.setGlobalPosition("mob_0", {x = 240.0, y = 800.0}, scene1)
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 480.0, screenHeight = 720.0);
+            screenWidth = 480, screenHeight = 720);
     Assert.assertTrue(Option.isEmpty(Scene.getEngineNode("mob_0" :: "sprite" :: Nil, scene2)))
 
 /// 複数の Mob のうち画面外に出たものだけ削除される
@@ -145,11 +145,11 @@ def testMobSceneRemoveOnlyExitedMobs(): Unit \ Assert =
         |> MobScene.spawnMob("mob_1", {x = 200.0, y = 400.0})
         |> MobScene.spawnMob("mob_2", {x = 300.0, y = 500.0})
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 480.0, screenHeight = 720.0);
+            screenWidth = 480, screenHeight = 720);
     // フレーム2: mob_1 だけ画面外に移動
     let scene2 = Scene.setGlobalPosition("mob_1", {x = 200.0, y = 900.0}, scene1)
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 480.0, screenHeight = 720.0);
+            screenWidth = 480, screenHeight = 720);
     let mob0Exists = not Option.isEmpty(Scene.getEngineNode("mob_0" :: Nil, scene2));
     let mob1Exists = not Option.isEmpty(Scene.getEngineNode("mob_1" :: Nil, scene2));
     let mob2Exists = not Option.isEmpty(Scene.getEngineNode("mob_2" :: Nil, scene2));
@@ -215,12 +215,12 @@ def testMobSceneIntegrationFallAndRemove(): Unit \ Assert =
     let scene1 = Scene.empty()
         |> MobScene.spawnMob("mob_0", {x = 240.0, y = 360.0})
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 480.0, screenHeight = 720.0);
+            screenWidth = 480, screenHeight = 720);
     // フレーム2: 重力で画面外まで落下 → 削除
     let scene2 = scene1
         |> PhysicsStep.integrate(1.0, PhysicsStep.defaultGravity())
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 480.0, screenHeight = 720.0);
+            screenWidth = 480, screenHeight = 720);
     Assert.assertTrue(Option.isEmpty(Scene.getEngineNode("mob_0" :: Nil, scene2)))
 
 /// Mob が落下中でもまだ画面内なら削除されない
@@ -234,10 +234,10 @@ def testMobSceneIntegrationFallButStillOnScreen(): Unit \ Assert =
     let scene1 = Scene.empty()
         |> MobScene.spawnMob("mob_0", {x = 240.0, y = 360.0})
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 480.0, screenHeight = 720.0);
+            screenWidth = 480, screenHeight = 720);
     // フレーム2: 少しだけ落下 → まだ画面内
     let scene2 = scene1
         |> PhysicsStep.integrate(0.1, PhysicsStep.defaultGravity())
         |> ScreenNotifyEvent.handleScreenExited(
-            screenWidth = 480.0, screenHeight = 720.0);
+            screenWidth = 480, screenHeight = 720);
     Assert.assertTrue(not Option.isEmpty(Scene.getEngineNode("mob_0" :: Nil, scene2)))

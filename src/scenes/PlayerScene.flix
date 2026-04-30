@@ -67,9 +67,9 @@ mod PlayerScene {
     // ========================================================================
 
     /// プレイヤーの ready 処理: ビューポートサイズを取得し、非表示にした sprite と更新済み PlayerData を返す
-    pub def ready(sprite: AnimatedSprite2D, playerData: PlayerData): (AnimatedSprite2D, PlayerData) \ Engine.Game =
+    pub def ready(sprite: AnimatedSprite2D, playerData: PlayerData): (AnimatedSprite2D, PlayerData) \ GameEngine.Game =
         // (hide(sprite), ...) — スタート画面実装時に復活させる
-        (sprite, {screenSize = Engine.Game.getViewportRect()#size | playerData})
+        (sprite, {screenSize = GameEngine.Game.getViewportRect()#size | playerData})
 
     // ========================================================================
     // 毎フレーム処理（Node.process から委譲される）

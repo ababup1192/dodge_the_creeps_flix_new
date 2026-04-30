@@ -1,7 +1,7 @@
 def main(): Unit \ IO =
-    if (Engine.ensureMainThread()) ()
+    if (GameEngine.ensureMainThread()) ()
     else {
-        let config: Engine.EngineConfig = {
+        let config: GameEngine.EngineConfig = {
             screenWidth = Game.screenWi(),
             screenHeight = Game.screenHi(),
             title = "Dodge the Creeps!",
@@ -18,6 +18,6 @@ def main(): Unit \ IO =
             clearColor = {r = 0.3f32, g = 0.3f32, b = 0.3f32}
         };
         run {
-            Game.start(Engine.Game.getFontAtlas("default"))
+            Game.start(GameEngine.Game.getFontAtlas("default"))
         } with LwjglLayer.withLwjgl(config)
     }

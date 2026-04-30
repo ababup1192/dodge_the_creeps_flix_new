@@ -18,8 +18,8 @@ pub trait CanvasItem[a] {
     /// 所属する Viewport の矩形を返す（Godot CanvasItem.get_viewport_rect 準拠）
     /// 現在は常にルート Viewport（デザイン解像度）を返す。
     /// SubViewport 導入時はエフェクトハンドラのスコープで切り替わる。
-    pub def getViewportRect(_node: a): Rect2.Rect2 \ Engine.Game =
-        Engine.Game.getViewportRect()
+    pub def getViewportRect(_node: a): Rect2.Rect2 \ GameEngine.Game =
+        GameEngine.Game.getViewportRect()
 
     // デフォルト実装
     pub def show(node: a): a = CanvasItem.setVisible(true, node)

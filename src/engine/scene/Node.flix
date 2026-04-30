@@ -14,7 +14,7 @@ pub trait Node[s] {
     // ── ライフサイクル ──
 
     /// ノードがシーンツリーに追加された後、最初に一度だけ呼ばれる初期化コールバック
-    pub def ready(node: EngineNode[s], _path: NodePath, scene: Scene[s]): (EngineNode[s], Scene[s]) \ Engine.Game =
+    pub def ready(node: EngineNode[s], _path: NodePath, scene: Scene[s]): (EngineNode[s], Scene[s]) \ GameEngine.Game =
             checked_ecast((node, scene))
 
     /// 毎フレーム呼ばれる更新コールバック

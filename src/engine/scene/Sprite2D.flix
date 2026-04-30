@@ -58,7 +58,7 @@ mod Sprite2D {
         Sprite2D.Sprite2D({flipV = v | r})
 
     /// グローバル座標を受け取り Drawable に変換する
-    pub def toDrawableAt(sprite: Sprite2D, globalPos: Vec2.Vec2): Engine.Drawable =
+    pub def toDrawableAt(sprite: Sprite2D, globalPos: Vec2.Vec2): GameEngine.Drawable =
         let Sprite2D.Sprite2D(r) = sprite;
         {
             texture = r#texture,

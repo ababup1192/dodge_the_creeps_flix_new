@@ -107,7 +107,7 @@ mod EngineNode {
 
     /// Sprite2D を Drawable に変換する
     /// centered=false（背景）の場合は scale を uvScale にしてタイリングする
-    pub def spriteToDrawable(sprite: Sprite2D, globalPos: Vec2.Vec2): Engine.Drawable =
+    pub def spriteToDrawable(sprite: Sprite2D, globalPos: Vec2.Vec2): GameEngine.Drawable =
         let Sprite2D.Sprite2D(r) = sprite;
         let uvSc: Vec2.Vec2 = if (r#centered) {x = 1.0, y = 1.0}
                                else r#scale;
@@ -124,7 +124,7 @@ mod EngineNode {
         }
 
     /// AnimatedSprite2D を Drawable に変換する
-    pub def animSpriteToDrawable(sprite: AnimatedSprite2D, globalPos: Vec2.Vec2): Engine.Drawable =
+    pub def animSpriteToDrawable(sprite: AnimatedSprite2D, globalPos: Vec2.Vec2): GameEngine.Drawable =
         let AnimatedSprite2D.AnimatedSprite2D(r) = sprite;
         {
             texture = AnimatedSprite2D.currentTexture(sprite),
@@ -139,7 +139,7 @@ mod EngineNode {
         }
 
     /// EngineNode からフォールバック用 Drawable を組み立てる（デバッグ表示用）
-    pub def fallbackDrawable(node: EngineNode[s], globalPos: Vec2.Vec2): Engine.Drawable =
+    pub def fallbackDrawable(node: EngineNode[s], globalPos: Vec2.Vec2): GameEngine.Drawable =
         {
             texture = "white",
             position = globalPos,
@@ -334,8 +334,8 @@ instance CollisionObject2D[EngineNode[s]] {
 
 // ── Renderable 実装 ──
 
-instance Engine.Renderable[EngineNode[s]] {
-    pub def toDrawables(node: EngineNode[s], globalPos: Vec2.Vec2): List[Engine.Drawable] =
+instance GameEngine.Renderable[EngineNode[s]] {
+    pub def toDrawables(node: EngineNode[s], globalPos: Vec2.Vec2): List[GameEngine.Drawable] =
         match node {
             case EngineNode.Sprite2DWithState(sprite, _) =>
                 EngineNode.spriteToDrawable(sprite, globalPos) :: Nil

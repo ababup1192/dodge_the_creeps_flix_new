@@ -46,14 +46,16 @@ mod VisibleOnScreenNotifier2D {
     ///   通知矩形: nodePosition + rect.position から rect.size 分の領域
     ///
     pub def isOnScreen(nodePosition: Vec2.Vec2, notifier: VisibleOnScreenNotifier2D,
-                       screenWidth: {screenWidth = Float64},
-                       screenHeight: {screenHeight = Float64}): Bool =
+                       screenWidth: {screenWidth = Int32},
+                       screenHeight: {screenHeight = Int32}): Bool =
         let VisibleOnScreenNotifier2D.VisibleOnScreenNotifier2D(r) = notifier;
         let rectPos = Vec2.add(nodePosition, r#rect#position);
         let rectEnd = Vec2.add(rectPos, r#rect#size);
+        let sw = Int32.toFloat64(screenWidth#screenWidth);
+        let sh = Int32.toFloat64(screenHeight#screenHeight);
         // AABB 重なり判定: 画面矩形 (0,0)-(w,h) と通知矩形
         rectEnd#x > 0.0 and
-        rectPos#x < screenWidth#screenWidth and
+        rectPos#x < sw and
         rectEnd#y > 0.0 and
-        rectPos#y < screenHeight#screenHeight
+        rectPos#y < sh
 }

@@ -1,4 +1,4 @@
-// LWJGL rendering backend — handles Engine.Game effect with OpenGL (minimal)
+// LWJGL rendering backend — handles GameEngine.Game effect with OpenGL (minimal)
 
 mod LwjglLayer {
     import org.lwjgl.glfw.GLFW
@@ -104,7 +104,7 @@ mod LwjglLayer {
     // Texture Loading
     // ========================================================================
 
-    def loadTexture(path: String, alpha: Bool): Engine.TextureInfo \ IO =
+    def loadTexture(path: String, alpha: Bool): GameEngine.TextureInfo \ IO =
         let stack = MemoryStack.stackPush();
         let w = stack.mallocInt(1);
         let h = stack.mallocInt(1);
@@ -131,7 +131,7 @@ mod LwjglLayer {
             { id = textureID, width = Int32.toFloat64(texWidth), height = Int32.toFloat64(texHeight) }
         }
 
-    def loadTextureRegistry(manifest: List[Engine.TextureEntry]): Engine.TextureRegistry \ IO =
+    def loadTextureRegistry(manifest: List[GameEngine.TextureEntry]): GameEngine.TextureRegistry \ IO =
         List.foldLeft((registry, entry) -> {
             let texInfo = loadTexture(entry#path, entry#hasAlpha);
             println("  ${entry#path} loaded (${texInfo#width}x${texInfo#height})");
@@ -139,20 +139,20 @@ mod LwjglLayer {
         }, Map.empty(), manifest)
 
     // ========================================================================
-    // Key Mapping (Engine.Key → GLFW key code)
+    // Key Mapping (GameEngine.Key → GLFW key code)
     // ========================================================================
 
-    def keyToGlfw(key: Engine.Key): Int32 = match key {
-        case Engine.Key.W     => 87
-        case Engine.Key.A     => 65
-        case Engine.Key.S     => 83
-        case Engine.Key.D     => 68
-        case Engine.Key.Up    => 265
-        case Engine.Key.Down  => 264
-        case Engine.Key.Left  => 263
-        case Engine.Key.Right => 262
-        case Engine.Key.Enter  => 257
-        case Engine.Key.Escape => 256
+    def keyToGlfw(key: GameEngine.Key): Int32 = match key {
+        case GameEngine.Key.W     => 87
+        case GameEngine.Key.A     => 65
+        case GameEngine.Key.S     => 83
+        case GameEngine.Key.D     => 68
+        case GameEngine.Key.Up    => 265
+        case GameEngine.Key.Down  => 264
+        case GameEngine.Key.Left  => 263
+        case GameEngine.Key.Right => 262
+        case GameEngine.Key.Enter  => 257
+        case GameEngine.Key.Escape => 256
     }
 
     // ========================================================================
@@ -249,9 +249,9 @@ mod LwjglLayer {
 
     /// ビューポート計算・レターボックス処理を含むフレーム描画処理。
     /// render ハンドラとリサイズコールバックの両方から呼ばれる。
-    def renderFrame(shader: Int32, vao: Int32, registry: Engine.TextureRegistry,
+    def renderFrame(shader: Int32, vao: Int32, registry: GameEngine.TextureRegistry,
                     clearColor: Color, designW: Float64, designH: Float64,
-                    fbW: Int32, fbH: Int32, drawables: List[Engine.Drawable]): Unit \ IO =
+                    fbW: Int32, fbH: Int32, drawables: List[GameEngine.Drawable]): Unit \ IO =
         if (fbW > 0 and fbH > 0) {
             let (vpX, vpY, vpW, vpH) = calcViewport(fbW, fbH, designW, designH);
             // フレームバッファ全体を黒でクリア（レターボックス/ピラーボックス領域）
@@ -285,7 +285,7 @@ mod LwjglLayer {
     // Font Atlas Baking (STBTruetype)
     // ========================================================================
 
-    def bakeFontAtlas(entry: Engine.FontEntry): (FontAtlas, Engine.TextureInfo) \ IO =
+    def bakeFontAtlas(entry: GameEngine.FontEntry): (FontAtlas, GameEngine.TextureInfo) \ IO =
         let bitmapSize = 512;
         let charCount = 96;   // ASCII 32-127
         let firstChar = 32;
@@ -344,7 +344,7 @@ mod LwjglLayer {
         cdata.free();
 
         let texName = "font_${entry#name}";
-        let texInfo: Engine.TextureInfo = { id = texId, width = bitmapSizeF, height = bitmapSizeF };
+        let texInfo: GameEngine.TextureInfo = { id = texId, width = bitmapSizeF, height = bitmapSizeF };
         let atlas: FontAtlas = {
             textureName = texName,
             fontSize = entry#fontSize,
@@ -353,8 +353,8 @@ mod LwjglLayer {
         };
         (atlas, texInfo)
 
-    def bakeFontAtlases(manifest: List[Engine.FontEntry],
-                        registry: Engine.TextureRegistry): (Map[String, FontAtlas], Engine.TextureRegistry) \ IO =
+    def bakeFontAtlases(manifest: List[GameEngine.FontEntry],
+                        registry: GameEngine.TextureRegistry): (Map[String, FontAtlas], GameEngine.TextureRegistry) \ IO =
         List.foldLeft((acc, entry) -> {
             let (atlases, reg) = acc;
             let (atlas, texInfo) = bakeFontAtlas(entry);
@@ -365,10 +365,10 @@ mod LwjglLayer {
         }, (Map.empty(), registry), manifest)
 
     // ========================================================================
-    // LWJGL Handler for Engine.Game effect
+    // LWJGL Handler for GameEngine.Game effect
     // ========================================================================
 
-    pub def withLwjgl(config: Engine.EngineConfig, f: Unit -> a \ ef): a \ ef - Engine.Game + IO =
+    pub def withLwjgl(config: GameEngine.EngineConfig, f: Unit -> a \ ef): a \ ef - GameEngine.Game + IO =
         if (not GLFW.glfwInit()) {
             println("GLFW init failed");
             bug!("GLFW failed")
@@ -414,7 +414,7 @@ mod LwjglLayer {
         let timeHolder = Array#{System.nanoTime()} @ Static;
 
         // リサイズ中の再描画用に最後のフレームの描画リストを保持する
-        let drawablesHolder = Array#{(Nil: List[Engine.Drawable])} @ Static;
+        let drawablesHolder = Array#{(Nil: List[GameEngine.Drawable])} @ Static;
 
         // macOS ではリサイズ中に glfwPollEvents がブロックされるため、
         // フレームバッファサイズ変更コールバックで再描画を行う
@@ -428,7 +428,7 @@ mod LwjglLayer {
 
         let result = run {
             f()
-        } with handler Engine.Game {
+        } with handler GameEngine.Game {
             def render(drawables, k) = {
                 Array.put(drawables, 0, drawablesHolder);
                 let stack = MemoryStack.stackPush();

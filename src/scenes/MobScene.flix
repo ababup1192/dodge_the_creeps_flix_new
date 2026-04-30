@@ -17,8 +17,9 @@ mod MobScene {
     /// Mob のテクスチャ名
     def mobTexture(): String = "enemyWalking_1"
 
-    /// Mob の衝突半径
-    def mobRadius(): Float64 = 20.0
+    /// Mob の衝突形状（Godot チュートリアル準拠の CapsuleShape2D）
+    def mobCollisionShape(): CollisionShape2D =
+        CollisionShape2D.CapsuleShape2D({radius = 37.0, height = 100.0, vertical = true})
 
     /// Mob のスプライトスケール
     def mobScale(): Vec2.Vec2 = {x = 0.5, y = 0.5}
@@ -46,8 +47,7 @@ mod MobScene {
     /// position は画面上部（Y < 0）に指定して、重力で落下させる想定。
     pub def spawnMob(name: String, position: Vec2.Vec2,
                      scene: Scene[GameData]): Scene[GameData] =
-        let shape = CollisionShape2D.CircleShape2D({radius = mobRadius()});
-        let body = RigidBody2D.make(position, shape);
+        let body = RigidBody2D.make(position, mobCollisionShape());
         let sprite = Sprite2D.make(mobTexture(), Vec2.zero(), mobScale());
         let notifier = MobScene.mobNotifier();
         scene

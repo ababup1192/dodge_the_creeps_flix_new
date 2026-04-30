@@ -27,8 +27,8 @@ pub mod ScreenNotifyEvent {
     ///
     /// prevOnScreen を更新して返す。
     pub def handleScreenExited(
-            screenWidth: {screenWidth = Float64},
-            screenHeight: {screenHeight = Float64},
+            screenWidth: {screenWidth = Int32},
+            screenHeight: {screenHeight = Int32},
             scene: Scene[s]): Scene[s] with ScreenNotifyHandler[s] =
         let prevOnScreen = Scene.getPrevOnScreen(scene);
         let paths = Scene.preorderPaths(scene);

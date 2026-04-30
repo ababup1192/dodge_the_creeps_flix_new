@@ -55,7 +55,7 @@ mod Label2D {
 
     /// テキストから Drawable のリストを生成する
     /// 各グリフに対して1つの Drawable を生成する
-    pub def toDrawables(label: Label2D, globalPos: Vec2.Vec2): List[Engine.Drawable] =
+    pub def toDrawables(label: Label2D, globalPos: Vec2.Vec2): List[GameEngine.Drawable] =
         let Label2D.Label2D(r) = label;
         let atlas = r#fontAtlas;
         let scale = r#fontSize / atlas#fontSize;

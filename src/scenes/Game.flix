@@ -19,7 +19,7 @@ pub type alias GameState = {
 
 instance Node[GameData] {
     redef ready(node: EngineNode[GameData],
-                _path: NodePath, scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) \ Engine.Game =
+                _path: NodePath, scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) \ GameEngine.Game =
         match node {
             case EngineNode.AnimSprite2DWithState(sprite, GameData.Player(playerNode, playerData)) =>
                 let (readySprite, readyPlayerData) = PlayerScene.ready(sprite, playerData);
@@ -41,12 +41,16 @@ instance Node[GameData] {
         }
 }
 
-// ── AreaHandler 実装 ──
-
+// 衝突判定
 instance AreaHandler[GameData] {
-    pub def onAreaEntered(_selfPath: NodePath, _selfState: GameData,
-                          _otherPath: NodePath, _otherState: GameData,
-                          scene: Scene[GameData]): Scene[GameData] = scene
+    pub def onAreaEntered(_selfPath: NodePath, selfState: GameData,
+                          _otherPath: NodePath, otherState: GameData,
+                          scene: Scene[GameData]): Scene[GameData] =
+        match (selfState, otherState) {
+            case (GameData.PlayerArea, GameData.MobData) =>
+                PlayerScene.mapSprite(CanvasItem.hide, scene)
+            case _ => scene
+        }
 }
 
 // ── ScreenNotifyHandler 実装 ──
@@ -84,44 +88,46 @@ mod Game {
     // ========================================================================
 
     /// WASD / 矢印キーから方向ベクトルを返す
-    pub def readInputDirection(): Vec2.Vec2 \ Engine.Game =
+    pub def readInputDirection(): Vec2.Vec2 \ GameEngine.Game =
         let xDir =
-            (if (Engine.Game.isKeyPressed(Engine.Key.D))      1.0 else 0.0) +
-            (if (Engine.Game.isKeyPressed(Engine.Key.Right))   1.0 else 0.0) +
-            (if (Engine.Game.isKeyPressed(Engine.Key.A))      -1.0 else 0.0) +
-            (if (Engine.Game.isKeyPressed(Engine.Key.Left))   -1.0 else 0.0);
+            (if (GameEngine.Game.isKeyPressed(GameEngine.Key.D))      1.0 else 0.0) +
+            (if (GameEngine.Game.isKeyPressed(GameEngine.Key.Right))   1.0 else 0.0) +
+            (if (GameEngine.Game.isKeyPressed(GameEngine.Key.A))      -1.0 else 0.0) +
+            (if (GameEngine.Game.isKeyPressed(GameEngine.Key.Left))   -1.0 else 0.0);
         let yDir =
-            (if (Engine.Game.isKeyPressed(Engine.Key.S))      1.0 else 0.0) +
-            (if (Engine.Game.isKeyPressed(Engine.Key.Down))    1.0 else 0.0) +
-            (if (Engine.Game.isKeyPressed(Engine.Key.W))      -1.0 else 0.0) +
-            (if (Engine.Game.isKeyPressed(Engine.Key.Up))     -1.0 else 0.0);
+            (if (GameEngine.Game.isKeyPressed(GameEngine.Key.S))      1.0 else 0.0) +
+            (if (GameEngine.Game.isKeyPressed(GameEngine.Key.Down))    1.0 else 0.0) +
+            (if (GameEngine.Game.isKeyPressed(GameEngine.Key.W))      -1.0 else 0.0) +
+            (if (GameEngine.Game.isKeyPressed(GameEngine.Key.Up))     -1.0 else 0.0);
         {x = xDir, y = yDir}
 
     // ========================================================================
     // メインル��プ
     // ========================================================================
 
-    pub def start(fontAtlas: FontAtlas): Unit \ Engine.Game =
+    pub def start(fontAtlas: FontAtlas): Unit \ GameEngine.Game =
         let state = buildState(fontAtlas);
         let startedState: GameState = {
             scene = PlayerScene.start({x = 240.0, y = 360.0}, state#scene)
             | state };
         gameLoop(fontAtlas, startedState)
 
-    def gameLoop(fontAtlas: FontAtlas, state: GameState): Unit \ Engine.Game =
-        if (Engine.Game.shouldClose()) ()
-        else if (Engine.Game.isKeyPressed(Engine.Key.Escape)) ()
+    def gameLoop(fontAtlas: FontAtlas, state: GameState): Unit \ GameEngine.Game =
+        if (GameEngine.Game.shouldClose()) ()
+        else if (GameEngine.Game.isKeyPressed(GameEngine.Key.Escape)) ()
         else {
-            let dt = Engine.Game.getDeltaTime();
+            let dt = GameEngine.Game.getDeltaTime();
             let dir = readInputDirection();
             let gravity = PhysicsStep.defaultGravity();
-            let screenW = Int32.toFloat64(screenWi());
-            let screenH = Int32.toFloat64(screenHi());
-            { scene = state#scene
-                |> PlayerScene.applyInput(dir)
-                |> GameEngine.updateFull(dt, false, gravity,
-                    screenWidth = screenW, screenHeight = screenH)
-              | state }
+            let updateScene =
+                PlayerScene.applyInput(dir)
+                >> GameEngine.process(dt, false)
+                >> GameEngine.physics(dt, false, gravity)
+                >> GameEngine.collisions
+                >> GameEngine.offscreen(screenWidth = screenWi(), screenHeight = screenHi());
+            let updatedScene = updateScene(state#scene);
+            GameEngine.render(updatedScene);
+            { scene = updatedScene | state }
                 |> MobScene.maybeSpawnMob(dt)
                 |> gameLoop(fontAtlas)
         }

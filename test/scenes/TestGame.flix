@@ -4,8 +4,8 @@
 // テスト用ヘルパー
 // ========================================================================
 
-def withMockEngine(f: Unit -> a \ ef + Engine.Game): a \ ef =
-    run f() with handler Engine.Game {
+def withMockEngine(f: Unit -> a \ ef + GameEngine.Game): a \ ef =
+    run f() with handler GameEngine.Game {
         def render(_, k) = k(())
         def shouldClose(k) = k(false)
         def getDeltaTime(k) = k(0.016)
@@ -14,9 +14,9 @@ def withMockEngine(f: Unit -> a \ ef + Engine.Game): a \ ef =
         def getViewportRect(k) = k(Rect2.fromSize({x = 480.0, y = 720.0}))
     }
 
-/// 指定キーが押されている Engine.Game ハンドラ
-def withKeysPressed(keys: Set[Engine.Key], f: Unit -> a \ ef + Engine.Game): a \ ef =
-    run f() with handler Engine.Game {
+/// 指定キーが押されている GameEngine.Game ハンドラ
+def withKeysPressed(keys: Set[GameEngine.Key], f: Unit -> a \ ef + GameEngine.Game): a \ ef =
+    run f() with handler GameEngine.Game {
         def render(_, k) = k(())
         def shouldClose(k) = k(false)
         def getDeltaTime(k) = k(0.016)
@@ -128,31 +128,31 @@ def testAnimSpriteLoops(): Unit \ Assert =
 /// D キーで右方向 (1, 0)
 @Test
 def testInputDirectionRight(): Unit \ Assert =
-    let dir = withKeysPressed(Set#{Engine.Key.D}, () -> Game.readInputDirection());
+    let dir = withKeysPressed(Set#{GameEngine.Key.D}, () -> Game.readInputDirection());
     Assert.assertEq(expected = (1.0, 0.0), vecToTuple(dir))
 
 /// A キーで左方向 (-1, 0)
 @Test
 def testInputDirectionLeft(): Unit \ Assert =
-    let dir = withKeysPressed(Set#{Engine.Key.A}, () -> Game.readInputDirection());
+    let dir = withKeysPressed(Set#{GameEngine.Key.A}, () -> Game.readInputDirection());
     Assert.assertEq(expected = (-1.0, 0.0), vecToTuple(dir))
 
 /// W キーで上方向 (0, -1)
 @Test
 def testInputDirectionUp(): Unit \ Assert =
-    let dir = withKeysPressed(Set#{Engine.Key.W}, () -> Game.readInputDirection());
+    let dir = withKeysPressed(Set#{GameEngine.Key.W}, () -> Game.readInputDirection());
     Assert.assertEq(expected = (0.0, -1.0), vecToTuple(dir))
 
 /// S キーで下方向 (0, 1)
 @Test
 def testInputDirectionDown(): Unit \ Assert =
-    let dir = withKeysPressed(Set#{Engine.Key.S}, () -> Game.readInputDirection());
+    let dir = withKeysPressed(Set#{GameEngine.Key.S}, () -> Game.readInputDirection());
     Assert.assertEq(expected = (0.0, 1.0), vecToTuple(dir))
 
 /// 矢印キーも対応
 @Test
 def testInputDirectionArrow(): Unit \ Assert =
-    let dir = withKeysPressed(Set#{Engine.Key.Right}, () -> Game.readInputDirection());
+    let dir = withKeysPressed(Set#{GameEngine.Key.Right}, () -> Game.readInputDirection());
     Assert.assertEq(expected = (1.0, 0.0), vecToTuple(dir))
 
 /// キーなしでゼロベクトル

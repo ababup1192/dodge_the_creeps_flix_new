@@ -360,7 +360,7 @@ pub mod Scene {
         }
 
     /// 全ノードの ready を preorder で一度だけ呼び出し、readied フラグを設定する（エンジン内部用）
-    def readyAll(scene: Scene[s]): Scene[s] \ Engine.Game with Node[s] =
+    def readyAll(scene: Scene[s]): Scene[s] \ GameEngine.Game with Node[s] =
         let Scene.Scene(r) = scene;
         foldNodes((engineNode, path, sc) ->
             Node.ready(engineNode, path, sc),
@@ -369,7 +369,7 @@ pub mod Scene {
     /// 全ノードの process を preorder（親→子）の順で呼び出す
     /// EngineNode.engineProcess（AnimSprite2D のフレーム送り等）も自動実行される
     /// 初回呼び出し時に readyAll を自動実行する
-    pub def processAll(delta: Float64, paused: Bool, scene: Scene[s]): Scene[s] \ Engine.Game with Node[s] =
+    pub def processAll(delta: Float64, paused: Bool, scene: Scene[s]): Scene[s] \ GameEngine.Game with Node[s] =
         let Scene.Scene(r) = scene;
         let readiedScene = if (not r#readied) readyAll(scene) else scene;
         foldNodes((engineNode, path, sc) ->
@@ -395,7 +395,7 @@ pub mod Scene {
     // ========================================================================
 
     /// EngineNode のプロパティから Drawable を組み立てる（フォールバック用）
-    pub def toDrawable(texture: String, engineNode: EngineNode[s], globalPos: Vec2.Vec2): Engine.Drawable =
+    pub def toDrawable(texture: String, engineNode: EngineNode[s], globalPos: Vec2.Vec2): GameEngine.Drawable =
         {
             texture = texture,
             position = globalPos,
@@ -410,13 +410,13 @@ pub mod Scene {
 
     /// 可視ノードを Drawable のリストに変換する
     /// 各ノードが複数 Drawable を返せるよう flatMap ベースで処理する
-    pub def toDrawables(scene: Scene[s]): List[Engine.Drawable] =
+    pub def toDrawables(scene: Scene[s]): List[GameEngine.Drawable] =
         preorderPaths(scene)
             |> List.flatMap(path ->
                 match getEngineNode(path, scene) {
                     case Some(engineNode) =>
                         if (CanvasItem.isVisible(engineNode))
-                            Engine.Renderable.toDrawables(engineNode, globalPositionAt(path, scene))
+                            GameEngine.Renderable.toDrawables(engineNode, globalPositionAt(path, scene))
                         else Nil
                     case None => Nil
                 }
