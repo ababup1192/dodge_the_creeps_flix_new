@@ -82,7 +82,7 @@ mod EngineNode {
 
     /// エンジンレベルの毎フレーム処理
     /// AnimatedSprite2D のフレーム送りを自動で行う。
-    pub def engineProcess(delta: Float32, node: EngineNode[s]): EngineNode[s] = match node {
+    pub def engineProcess(delta: Float64, node: EngineNode[s]): EngineNode[s] = match node {
         case EngineNode.AnimSprite2DWithState(sprite, state) =>
             EngineNode.AnimSprite2DWithState(AnimatedSprite2D.advanceFrame(delta, sprite), state)
         case _ => node
@@ -92,16 +92,16 @@ mod EngineNode {
     /// centered=false（背景）の場合は scale を uvScale にしてタイリングする
     pub def spriteToDrawable(sprite: Sprite2D, globalPos: Vec2.Vec2): Engine.Drawable =
         let Sprite2D.Sprite2D(r) = sprite;
-        let uvSc: Vec2.Vec2 = if (r#centered) {x = 1.0f32, y = 1.0f32}
+        let uvSc: Vec2.Vec2 = if (r#centered) {x = 1.0, y = 1.0}
                                else r#scale;
         {
             texture = r#texture,
             position = globalPos,
             scale = r#scale,
-            rotation = Float64.truncateToFloat32(r#rotation),
+            rotation = r#rotation,
             color = r#modulate,
             centered = r#centered,
-            uvOffset = {x = 0.0f32, y = 0.0f32},
+            uvOffset = {x = 0.0, y = 0.0},
             uvScale = uvSc,
             zIndex = r#zIndex
         }
@@ -113,11 +113,11 @@ mod EngineNode {
             texture = AnimatedSprite2D.currentTexture(sprite),
             position = globalPos,
             scale = r#scale,
-            rotation = Float64.truncateToFloat32(r#rotation),
+            rotation = r#rotation,
             color = r#modulate,
             centered = r#centered,
-            uvOffset = {x = 0.0f32, y = 0.0f32},
-            uvScale = {x = 1.0f32, y = 1.0f32},
+            uvOffset = {x = 0.0, y = 0.0},
+            uvScale = {x = 1.0, y = 1.0},
             zIndex = r#zIndex
         }
 
@@ -127,11 +127,11 @@ mod EngineNode {
             texture = "white",
             position = globalPos,
             scale = Node2D.getScale(node),
-            rotation = Float64.truncateToFloat32(Node2D.getRotation(node)),
+            rotation = Node2D.getRotation(node),
             color = CanvasItem.getModulate(node),
             centered = true,
-            uvOffset = {x = 0.0f32, y = 0.0f32},
-            uvScale = {x = 1.0f32, y = 1.0f32},
+            uvOffset = {x = 0.0, y = 0.0},
+            uvScale = {x = 1.0, y = 1.0},
             zIndex = CanvasItem.getZIndex(node)
         }
 }

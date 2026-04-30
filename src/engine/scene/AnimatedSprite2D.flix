@@ -23,8 +23,8 @@ pub enum AnimatedSprite2D {
         animations = Map[String, List[String]],    // アニメーション定義
         currentAnimation = String,                 // 再生中アニメーション名
         currentFrame = Int32,                      // 現在フレーム
-        fps = Float32,                             // フレームレート
-        elapsed = Float32,                         // 経過時間アキュムレータ
+        fps = Float64,                             // フレームレート
+        elapsed = Float64,                         // 経過時間アキュムレータ
         playing = Bool,                            // 再生中フラグ
         centered = Bool,                           // 中心を原点にするか
         offset = Vec2.Vec2,                        // 描画オフセット
@@ -39,7 +39,7 @@ mod AnimatedSprite2D {
     pub def make(
         animations: Map[String, List[String]],
         initialAnimation: {initialAnimation = String},
-        fps: {fps = Float32},
+        fps: {fps = Float64},
         position: Vec2.Vec2,
         scale: Vec2.Vec2
     ): AnimatedSprite2D =
@@ -55,10 +55,10 @@ mod AnimatedSprite2D {
             currentAnimation = initialAnimation#initialAnimation,
             currentFrame = 0,
             fps = fps#fps,
-            elapsed = 0.0f32,
+            elapsed = 0.0,
             playing = true,
             centered = true,
-            offset = {x = 0.0f32, y = 0.0f32},
+            offset = {x = 0.0, y = 0.0},
             flipH = false,
             flipV = false
         })
@@ -76,12 +76,12 @@ mod AnimatedSprite2D {
         }
 
     /// 時間経過に応じてフレームを進める
-    pub def advanceFrame(delta: Float32, sprite: AnimatedSprite2D): AnimatedSprite2D =
+    pub def advanceFrame(delta: Float64, sprite: AnimatedSprite2D): AnimatedSprite2D =
         let AnimatedSprite2D.AnimatedSprite2D(r) = sprite;
         if (not r#playing) sprite
         else {
             let newElapsed = r#elapsed + delta;
-            let frameDuration = 1.0f32 / r#fps;
+            let frameDuration = 1.0 / r#fps;
             if (newElapsed >= frameDuration) {
                 let totalFrames = match Map.get(r#currentAnimation, r#animations) {
                     case Some(fs) => List.length(fs)
@@ -109,7 +109,7 @@ mod AnimatedSprite2D {
             AnimatedSprite2D.AnimatedSprite2D({
                 currentAnimation = animationName,
                 currentFrame = 0,
-                elapsed = 0.0f32,
+                elapsed = 0.0,
                 playing = true
                 | r
             })

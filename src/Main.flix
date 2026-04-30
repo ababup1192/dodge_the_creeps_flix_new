@@ -12,7 +12,7 @@ def main(): Unit \ IO =
                 {name = "playerGrey_up2", path = "textures/playerGrey_up2.png", hasAlpha = true} ::
                 Nil,
             fontManifest =
-                {name = "default", path = "textures/Xolonium-Regular.ttf", fontSize = 32.0f32} ::
+                {name = "default", path = "textures/Xolonium-Regular.ttf", fontSize = 32.0} ::
                 Nil,
             clearColor = {r = 0.3f32, g = 0.3f32, b = 0.3f32}
         };

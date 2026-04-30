@@ -37,7 +37,7 @@ mod Sprite2D {
             modulate = {r = 1.0f32, g = 1.0f32, b = 1.0f32},
             texture = texture,
             centered = true,
-            offset = {x = 0.0f32, y = 0.0f32},
+            offset = {x = 0.0, y = 0.0},
             flipH = false,
             flipV = false
         })
@@ -64,11 +64,11 @@ mod Sprite2D {
             texture = r#texture,
             position = globalPos,
             scale = r#scale,
-            rotation = Float64.truncateToFloat32(r#rotation),
+            rotation = r#rotation,
             color = r#modulate,
             centered = r#centered,
-            uvOffset = {x = 0.0f32, y = 0.0f32},
-            uvScale = {x = 1.0f32, y = 1.0f32},
+            uvOffset = {x = 0.0, y = 0.0},
+            uvScale = {x = 1.0, y = 1.0},
             zIndex = r#zIndex
         }
 }
@@ -124,4 +124,3 @@ instance Node2D[Sprite2D] {
         let Sprite2D.Sprite2D(r) = sprite;
         Sprite2D.Sprite2D({ skew = skew | r })
 }
-

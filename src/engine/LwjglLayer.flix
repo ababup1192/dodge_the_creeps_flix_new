@@ -20,6 +20,26 @@ mod LwjglLayer {
     import java.lang.System
     import java.io.FileInputStream
 
+    import java.lang.Math
+
+    // ========================================================================
+    // 数値変換ヘルパー
+    // ========================================================================
+
+    /// Float64 → Float32（GL uniform 用）
+    def f32(v: Float64): Float32 =
+        Float64.truncateToFloat32(v)
+
+    /// Float64 → Int32（四捨五入）
+    def floatToInt32(v: Float64): Int32 =
+        Int64.truncateToInt32(unchecked_cast(Math.round(v) as _ \ {}))
+
+    def sinF(x: Float64): Float64 =
+        unchecked_cast(Math.sin(x) as _ \ {})
+
+    def cosF(x: Float64): Float64 =
+        unchecked_cast(Math.cos(x) as _ \ {})
+
     // ========================================================================
     // Shader Sources
     // ========================================================================
@@ -108,7 +128,7 @@ mod LwjglLayer {
             GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
             STBImage.stbi_image_free(data);
             discard MemoryStack.stackPop();
-            { id = textureID, width = Int32.toFloat32(texWidth), height = Int32.toFloat32(texHeight) }
+            { id = textureID, width = Int32.toFloat64(texWidth), height = Int32.toFloat64(texHeight) }
         }
 
     def loadTextureRegistry(manifest: List[Engine.TextureEntry]): Engine.TextureRegistry \ IO =
@@ -159,45 +179,45 @@ mod LwjglLayer {
         GL30.glBindVertexArray(0);
         (vao, vbo)
 
-    def setProjectionMatrix(shader: Int32, width: Float32, height: Float32): Unit \ IO =
+    def setProjectionMatrix(shader: Int32, width: Float64, height: Float64): Unit \ IO =
         GL20.glUseProgram(shader);
-        let left = 0.0f32;
+        let left = 0.0;
         let right = width;
         let bottom = height;
-        let top = 0.0f32;
+        let top = 0.0;
         let proj = Array#{
-            2.0f32 / (right - left), 0.0f32, 0.0f32, 0.0f32,
-            0.0f32, 2.0f32 / (top - bottom), 0.0f32, 0.0f32,
+            f32(2.0 / (right - left)), 0.0f32, 0.0f32, 0.0f32,
+            0.0f32, f32(2.0 / (top - bottom)), 0.0f32, 0.0f32,
             0.0f32, 0.0f32, -1.0f32, 0.0f32,
-            -1.0f32 * (right + left) / (right - left), -1.0f32 * (top + bottom) / (top - bottom), 0.0f32, 1.0f32
+            f32(-1.0 * (right + left) / (right - left)), f32(-1.0 * (top + bottom) / (top - bottom)), 0.0f32, 1.0f32
         } @ Static;
         let loc = GL20.glGetUniformLocation(shader, "projection");
         GL20.glUniformMatrix4fv(loc, false, proj)
 
     def drawSprite(shader: Int32, texture: Int32, vao: Int32,
                    pos: Vec2.Vec2, size: Vec2.Vec2, color: Color,
-                   uvOff: Vec2.Vec2, uvSc: Vec2.Vec2, rot: Float32): Unit \ IO =
+                   uvOff: Vec2.Vec2, uvSc: Vec2.Vec2, rot: Float64): Unit \ IO =
         GL20.glUseProgram(shader);
-        let c = Vec2.cos32(rot);
-        let s = Vec2.sin32(rot);
+        let c = cosF(rot);
+        let s = sinF(rot);
         let sx = size#x;
         let sy = size#y;
-        let tx = pos#x + sx / 2.0f32 - c * sx / 2.0f32 + s * sy / 2.0f32;
-        let ty = pos#y + sy / 2.0f32 - s * sx / 2.0f32 - c * sy / 2.0f32;
+        let tx = pos#x + sx / 2.0 - c * sx / 2.0 + s * sy / 2.0;
+        let ty = pos#y + sy / 2.0 - s * sx / 2.0 - c * sy / 2.0;
         let model = Array#{
-            c * sx, s * sx, 0.0f32, 0.0f32,
-            -1.0f32 * s * sy, c * sy, 0.0f32, 0.0f32,
+            f32(c * sx), f32(s * sx), 0.0f32, 0.0f32,
+            f32(-1.0 * s * sy), f32(c * sy), 0.0f32, 0.0f32,
             0.0f32, 0.0f32, 1.0f32, 0.0f32,
-            tx, ty, 0.0f32, 1.0f32
+            f32(tx), f32(ty), 0.0f32, 1.0f32
         } @ Static;
         let modelLoc = GL20.glGetUniformLocation(shader, "model");
         GL20.glUniformMatrix4fv(modelLoc, false, model);
         let colorLoc = GL20.glGetUniformLocation(shader, "spriteColor");
         GL20.glUniform3f(colorLoc, color#r, color#g, color#b);
         let uvOffsetLoc = GL20.glGetUniformLocation(shader, "uvOffset");
-        GL20.glUniform2f(uvOffsetLoc, uvOff#x, uvOff#y);
+        GL20.glUniform2f(uvOffsetLoc, f32(uvOff#x), f32(uvOff#y));
         let uvScaleLoc = GL20.glGetUniformLocation(shader, "uvScale");
-        GL20.glUniform2f(uvScaleLoc, uvSc#x, uvSc#y);
+        GL20.glUniform2f(uvScaleLoc, f32(uvSc#x), f32(uvSc#y));
         GL13.glActiveTexture(GL13.GL_TEXTURE0);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture);
         GL30.glBindVertexArray(vao);
@@ -210,19 +230,19 @@ mod LwjglLayer {
 
     /// デザイン解像度のアスペクト比を維持しつつ、フレームバッファに収まる最大矩形を計算する。
     /// 戻り値: (vpX, vpY, vpW, vpH)
-    def calcViewport(fbW: Int32, fbH: Int32, designW: Float32, designH: Float32): (Int32, Int32, Int32, Int32) =
+    def calcViewport(fbW: Int32, fbH: Int32, designW: Float64, designH: Float64): (Int32, Int32, Int32, Int32) =
         let designAspect = designW / designH;
-        let windowAspect = Int32.toFloat32(fbW) / Int32.toFloat32(fbH);
+        let windowAspect = Int32.toFloat64(fbW) / Int32.toFloat64(fbH);
         if (windowAspect > designAspect) {
             // ピラーボックス（左右黒帯）
             let vpH = fbH;
-            let vpW = Vec2.floatToInt32(Int32.toFloat32(fbH) * designAspect);
+            let vpW = floatToInt32(Int32.toFloat64(fbH) * designAspect);
             let vpX = (fbW - vpW) / 2;
             (vpX, 0, vpW, vpH)
         } else {
             // レターボックス（上下黒帯）
             let vpW = fbW;
-            let vpH = Vec2.floatToInt32(Int32.toFloat32(fbW) / designAspect);
+            let vpH = floatToInt32(Int32.toFloat64(fbW) / designAspect);
             let vpY = (fbH - vpH) / 2;
             (0, vpY, vpW, vpH)
         }
@@ -230,7 +250,7 @@ mod LwjglLayer {
     /// ビューポート計算・レターボックス処理を含むフレーム描画処理。
     /// render ハンドラとリサイズコールバックの両方から呼ばれる。
     def renderFrame(shader: Int32, vao: Int32, registry: Engine.TextureRegistry,
-                    clearColor: Color, designW: Float32, designH: Float32,
+                    clearColor: Color, designW: Float64, designH: Float64,
                     fbW: Int32, fbH: Int32, drawables: List[Engine.Drawable]): Unit \ IO =
         if (fbW > 0 and fbH > 0) {
             let (vpX, vpY, vpW, vpH) = calcViewport(fbW, fbH, designW, designH);
@@ -252,7 +272,7 @@ mod LwjglLayer {
                         let displayH = texInfo#height * drawable#scale#y;
                         let displaySize: Vec2.Vec2 = {x = displayW, y = displayH};
                         let pos: Vec2.Vec2 = if (drawable#centered)
-                            {x = drawable#position#x - displayW / 2.0f32, y = drawable#position#y - displayH / 2.0f32}
+                            {x = drawable#position#x - displayW / 2.0, y = drawable#position#y - displayH / 2.0}
                         else
                             drawable#position;
                         drawSprite(shader, texInfo#id, vao, pos, displaySize, drawable#color, drawable#uvOffset, drawable#uvScale, drawable#rotation)
@@ -281,7 +301,7 @@ mod LwjglLayer {
         // STBTruetype でフォントを焼き込む
         let cdata = STBTTBakedChar.malloc(charCount);
         let bitmap = BufferUtils.createByteBuffer(bitmapSize * bitmapSize);
-        discard STBTruetype.stbtt_BakeFontBitmap(fontBuffer, entry#fontSize, bitmap, bitmapSize, bitmapSize, firstChar, cdata);
+        discard STBTruetype.stbtt_BakeFontBitmap(fontBuffer, f32(entry#fontSize), bitmap, bitmapSize, bitmapSize, firstChar, cdata);
 
         // GL_RED テクスチャとしてアップロード + swizzle で RGBA 化
         discard bitmap.position(0);
@@ -297,22 +317,22 @@ mod LwjglLayer {
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL33.GL_TEXTURE_SWIZZLE_A, GL11.GL_RED);
 
         // グリフメトリクスを構築（静的アクセサで各フィールドを取得）
-        let bitmapSizeF = Int32.toFloat32(bitmapSize);
+        let bitmapSizeF = Int32.toFloat64(bitmapSize);
         let baseAddr = cdata.address();
         let structSize = 20i64;   // STBTTBakedChar: 4 shorts (8B) + 3 floats (12B) = 20B
         let glyphs = List.range(0, charCount) |> List.foldLeft((acc, i) -> {
             let cp = firstChar + i;
             let addr = baseAddr + Int32.toInt64(i) * structSize;
-            let x0 = Int32.toFloat32(Int16.toInt32(STBTTBakedChar.nx0(addr)));
-            let y0 = Int32.toFloat32(Int16.toInt32(STBTTBakedChar.ny0(addr)));
-            let x1 = Int32.toFloat32(Int16.toInt32(STBTTBakedChar.nx1(addr)));
-            let y1 = Int32.toFloat32(Int16.toInt32(STBTTBakedChar.ny1(addr)));
+            let x0 = Int32.toFloat64(Int16.toInt32(STBTTBakedChar.nx0(addr)));
+            let y0 = Int32.toFloat64(Int16.toInt32(STBTTBakedChar.ny0(addr)));
+            let x1 = Int32.toFloat64(Int16.toInt32(STBTTBakedChar.nx1(addr)));
+            let y1 = Int32.toFloat64(Int16.toInt32(STBTTBakedChar.ny1(addr)));
             let gm: TextLayout.GlyphMetrics = {
-                xOff = STBTTBakedChar.nxoff(addr),
-                yOff = STBTTBakedChar.nyoff(addr),
+                xOff = Float32.toFloat64(STBTTBakedChar.nxoff(addr)),
+                yOff = Float32.toFloat64(STBTTBakedChar.nyoff(addr)),
                 glyphW = x1 - x0,
                 glyphH = y1 - y0,
-                advance = STBTTBakedChar.nxadvance(addr),
+                advance = Float32.toFloat64(STBTTBakedChar.nxadvance(addr)),
                 s0 = x0 / bitmapSizeF,
                 t0 = y0 / bitmapSizeF,
                 s1 = x1 / bitmapSizeF,
@@ -377,8 +397,8 @@ mod LwjglLayer {
         GL11.glEnable(GL11.GL_BLEND);
         GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
 
-        let screenW = Int32.toFloat32(config#screenWidth);
-        let screenH = Int32.toFloat32(config#screenHeight);
+        let screenW = Int32.toFloat64(config#screenWidth);
+        let screenH = Int32.toFloat64(config#screenHeight);
 
         let shader = createShaderProgram(vertexShaderSource(), fragmentShaderSource());
         setProjectionMatrix(shader, screenW, screenH);
@@ -431,7 +451,7 @@ mod LwjglLayer {
                 let prev = Array.get(0, timeHolder);
                 Array.put(currentTime, 0, timeHolder);
                 let dtNanos = currentTime - prev;
-                let dtf = Int64.toFloat32(dtNanos) / 1000000000.0f32;
+                let dtf = Int64.toFloat64(dtNanos) / 1000000000.0;
                 k(dtf)
             }
             def isKeyPressed(key, k) = {

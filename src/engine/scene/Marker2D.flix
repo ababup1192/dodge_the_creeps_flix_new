@@ -25,7 +25,7 @@ mod Marker2D {
         Marker2D.Marker2D({
             position = position,
             rotation = 0.0,
-            scale = {x = 1.0f32, y = 1.0f32},
+            scale = {x = 1.0, y = 1.0},
             skew = 0.0,
             visible = false,
             zIndex = 0,

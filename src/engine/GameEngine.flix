@@ -4,9 +4,9 @@
 mod GameEngine {
 
     /// 1 フレーム分の更新: processAll → render
-    pub def update(delta: Float32, paused: Bool, scene: Scene[s]): Scene[s] \ Engine.Game
+    pub def update(delta: Float64, paused: Bool, scene: Scene[s]): Scene[s] \ Engine.Game
             with Node[s] =
-        let processedScene = Scene.processAll(Float32.toFloat64(delta), paused, scene);
+        let processedScene = Scene.processAll(delta, paused, scene);
         render(processedScene);
         processedScene
 
@@ -14,9 +14,9 @@ mod GameEngine {
     /// processAndEmit → OnAreaEvent → render
     ///
     /// OnAreaEvent ハンドラは呼び出し元で提供する。
-    pub def updateWithAreaEvents(delta: Float32, paused: Bool, scene: Scene[s]): Scene[s] \ {Engine.Game, OnAreaEvent}
+    pub def updateWithAreaEvents(delta: Float64, paused: Bool, scene: Scene[s]): Scene[s] \ {Engine.Game, OnAreaEvent}
             with Node[s] =
-        let processedScene = AreaEvent.processAndEmit(Float32.toFloat64(delta), paused, scene);
+        let processedScene = AreaEvent.processAndEmit(delta, paused, scene);
         render(processedScene);
         processedScene
 
@@ -25,10 +25,10 @@ mod GameEngine {
     ///
     /// OnAreaEvent ハンドラ不要。ノード型の AreaHandler instance で衝突応答する。
     /// Scene 内の prevOverlaps を使って離脱イベントも発火される。
-    pub def updateWithAreaHandler(delta: Float32, paused: Bool,
+    pub def updateWithAreaHandler(delta: Float64, paused: Bool,
                                   scene: Scene[s]): Scene[s] \ Engine.Game
             with Node[s], AreaHandler[s] =
-        let processedScene = AreaEvent.processAndEmitHandled(Float32.toFloat64(delta), paused, scene);
+        let processedScene = AreaEvent.processAndEmitHandled(delta, paused, scene);
         render(processedScene);
         processedScene
 

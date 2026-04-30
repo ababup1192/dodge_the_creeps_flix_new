@@ -356,10 +356,9 @@ pub mod Scene {
     /// 全ノードの process を preorder（親→子）の順で呼び出す
     /// EngineNode.engineProcess（AnimSprite2D のフレーム送り等）も自動実行される
     pub def processAll(delta: Float64, paused: Bool, scene: Scene[s]): Scene[s] with Node[s] =
-        let dt = Float64.truncateToFloat32(delta);
         foldNodes((engineNode, path, sc) ->
             if (ProcessMode.shouldProcess(paused, Node.getProcessMode(EngineNode.getState(engineNode)))) {
-                let newEn = EngineNode.engineProcess(dt, engineNode);
+                let newEn = EngineNode.engineProcess(delta, engineNode);
                 Node.process(delta, newEn, path, sc)
             } else
                 (engineNode, sc),
@@ -375,11 +374,11 @@ pub mod Scene {
             texture = texture,
             position = globalPos,
             scale = Node2D.getScale(engineNode),
-            rotation = Float64.truncateToFloat32(Node2D.getRotation(engineNode)),
+            rotation = Node2D.getRotation(engineNode),
             color = CanvasItem.getModulate(engineNode),
             centered = true,
-            uvOffset = {x = 0.0f32, y = 0.0f32},
-            uvScale = {x = 1.0f32, y = 1.0f32},
+            uvOffset = {x = 0.0, y = 0.0},
+            uvScale = {x = 1.0, y = 1.0},
             zIndex = CanvasItem.getZIndex(engineNode)
         }
 

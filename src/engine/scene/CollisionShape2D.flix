@@ -10,8 +10,8 @@
 ///
 /// すべての判定関数は形状の **中心座標** を基準として受け取る。
 pub enum CollisionShape2D {
-    case RectShape2D({width = Float32, height = Float32})
-    case CircleShape2D({radius = Float32})
+    case RectShape2D({width = Float64, height = Float64})
+    case CircleShape2D({radius = Float64})
 }
 
 mod CollisionShape2D {
@@ -50,8 +50,8 @@ mod CollisionShape2D {
     ///
     pub def checkRectRect(posA: Vec2.Vec2, sizeA: Vec2.Vec2,
                            posB: Vec2.Vec2, sizeB: Vec2.Vec2): Bool =
-        let halfA = Vec2.div(sizeA, 2.0f32);
-        let halfB = Vec2.div(sizeB, 2.0f32);
+        let halfA = Vec2.div(sizeA, 2.0);
+        let halfB = Vec2.div(sizeB, 2.0);
         (posA#x + halfA#x > posB#x - halfB#x) and
         (posB#x + halfB#x > posA#x - halfA#x) and
         (posA#y + halfA#y > posB#y - halfB#y) and
@@ -62,8 +62,8 @@ mod CollisionShape2D {
     ///
     ///    (A)  <-->  (B)
     ///
-    pub def checkCircleCircle(posA: Vec2.Vec2, radiusA: Float32,
-                               posB: Vec2.Vec2, radiusB: Float32): Bool =
+    pub def checkCircleCircle(posA: Vec2.Vec2, radiusA: Float64,
+                               posB: Vec2.Vec2, radiusB: Float64): Bool =
         let distSq = Vec2.distanceSquaredTo(posA, posB);
         let sumR = radiusA + radiusB;
         distSq < sumR * sumR
@@ -75,12 +75,12 @@ mod CollisionShape2D {
     ///            |    |
     ///            +----+
     ///
-    pub def checkCircleRect(circlePos: Vec2.Vec2, radius: Float32,
+    pub def checkCircleRect(circlePos: Vec2.Vec2, radius: Float64,
                              rectPos: Vec2.Vec2, rectSize: Vec2.Vec2): Bool =
-        let halfW = rectSize#x / 2.0f32;
-        let halfH = rectSize#y / 2.0f32;
-        let dx = Float32.abs(circlePos#x - rectPos#x);
-        let dy = Float32.abs(circlePos#y - rectPos#y);
+        let halfW = rectSize#x / 2.0;
+        let halfH = rectSize#y / 2.0;
+        let dx = Float64.abs(circlePos#x - rectPos#x);
+        let dy = Float64.abs(circlePos#y - rectPos#y);
         if (dx >= halfW + radius) false
         else if (dy >= halfH + radius) false
         else if (dx <= halfW or dy <= halfH) true

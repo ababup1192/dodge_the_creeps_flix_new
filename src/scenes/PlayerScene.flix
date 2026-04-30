@@ -18,10 +18,10 @@ mod PlayerScene {
     def areaName(): String = "area"
 
     /// プレイヤー初期位置（画面中央）
-    def startPosition(): Vec2.Vec2 = {x = 240.0f32, y = 360.0f32}
+    def startPosition(): Vec2.Vec2 = {x = 240.0, y = 360.0}
 
     /// プレイヤー移動速度（px/秒）
-    def speed(): Float32 = 400.0f32
+    def speed(): Float64 = 400.0
 
     /// π（円周率）
     def pi(): Float64 = 3.14159265358979
@@ -31,7 +31,7 @@ mod PlayerScene {
 
     /// プレイヤーの衝突形状（半径 30 の円）
     def playerCollisionShape(): CollisionShape2D =
-        CollisionShape2D.CircleShape2D({radius = 30.0f32})
+        CollisionShape2D.CircleShape2D({radius = 30.0})
 
     /// プレイヤーのアニメーション定義
     def playerAnimations(): Map[String, List[String]] =
@@ -49,9 +49,9 @@ mod PlayerScene {
         let sprite = AnimatedSprite2D.make(
             playerAnimations(),
             initialAnimation = walkAnimation(),
-            fps = 6.0f32,
+            fps = 6.0,
             startPosition(),
-            {x = 1.0f32, y = 1.0f32});
+            {x = 1.0, y = 1.0});
         let area = Area2D.make(Vec2.zero(), playerCollisionShape());
         let pn: PlayerNode = { sprite = sprite, area = area };
         scene
@@ -82,21 +82,19 @@ mod PlayerScene {
     // ========================================================================
 
     /// プレイヤーノードの毎フレーム処理
-    pub def process(delta: Float64, sprite: AnimatedSprite2D,
-                    pn: PlayerNode, pd: PlayerData,
+    pub def process(dt: Float64, sprite: AnimatedSprite2D,
+                    playerNode: PlayerNode, playerData: PlayerData,
                     scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) =
-        let pn1 = { sprite = sprite | pn };
-        let dt = Float64.truncateToFloat32(delta);
-        let moved = movePlayer(dt, pd#screenSize, pn1#sprite, {velocity = pd#velocity});
-        let pn2 = { sprite = moved | pn1 };
-        (EngineNode.AnimSprite2DWithState(moved, GameData.Player(pn2, pd)), scene)
+        let movedSprite = movePlayer(dt, playerData#screenSize, sprite, {velocity = playerData#velocity});
+        let node = EngineNode.AnimSprite2DWithState(movedSprite, GameData.Player({ sprite = movedSprite | playerNode }, playerData));
+        (node, scene)
 
     // ========================================================================
     // 移動
     // ========================================================================
 
     /// 速度に応じてプレイヤーを移動し、画面範囲にクランプする
-    pub def movePlayer(dt: Float32, screenSize: Vec2.Vec2,
+    pub def movePlayer(dt: Float64, screenSize: Vec2.Vec2,
                        sprite: AnimatedSprite2D,
                        r: {velocity = Vec2.Vec2}): AnimatedSprite2D =
         let pos = Node2D.getPosition(sprite);
@@ -113,12 +111,11 @@ mod PlayerScene {
 
     /// Godot の start(pos) を再現: 位置設定 + 回転リセット + show
     pub def start(pos: Vec2.Vec2, scene: Scene[GameData]): Scene[GameData] =
-        scene |> Scene.mapEngineNode(name() :: Nil,
-            mapPlayerSprite(sprite ->
-                sprite
-                    |> position(pos)
-                    |> rotation(0.0)
-                    |> show))
+        scene |> mapSprite(sprite ->
+            sprite
+                |> position(pos)
+                |> rotation(0.0)
+                |> show)
 
     // ========================================================================
     // 入力適用
@@ -126,38 +123,67 @@ mod PlayerScene {
 
     /// 方向ベクトルに応じてプレイヤーの速度とアニメーションを更新する
     pub def applyInput(dir: Vec2.Vec2, scene: Scene[GameData]): Scene[GameData] =
-        let velocity = if (Vec2.length(dir) > 0.0f32)
+        let velocity = if (Vec2.length(dir) > 0.0)
                 Vec2.mul(Vec2.normalized(dir), speed())
             else
                 Vec2.zero();
+        let pd = extractPlayerData(scene);
         scene
-            |> Scene.mapState(name() :: Nil, state ->
-                match state {
-                    case GameData.Player(pn, pd) =>
-                        GameData.Player(pn, {velocity = velocity | pd})
-                    case other => other
-                })
-            |> Scene.mapEngineNode(name() :: Nil,
-                mapPlayerSprite(setPlayerAnimation(dir)))
+            |> setPlayerData({velocity = velocity | pd})
+            |> mapSprite(setPlayerAnimation(dir))
+
+    // ========================================================================
+    // アニメーション制御
+    // ========================================================================
+
+    /// 入力方向に応じてアニメーション・反転・回転を設定する
+    /// 本家 Godot 準拠: 横移動は walk + flipH + flipV=false、縦移動は up + rotation（下向きで PI）
+    pub def setPlayerAnimation(dir: Vec2.Vec2, sprite: AnimatedSprite2D): AnimatedSprite2D =
+        if (dir#x != 0.0)
+            sprite |> AnimatedSprite2D.play(walkAnimation())
+                   |> AnimatedSprite2D.setFlipV(false)
+                   |> AnimatedSprite2D.setFlipH(dir#x < 0.0)
+                   |> rotation(0.0)
+        else if (dir#y != 0.0)
+            sprite |> AnimatedSprite2D.play(upAnimation())
+                   |> rotation(if (dir#y > 0.0) pi() else 0.0)
+        else
+            AnimatedSprite2D.stop(sprite)
 
     // ========================================================================
     // PlayerNode ヘルパー
     // ========================================================================
 
-    /// EngineNode の sprite と pn#sprite を同時更新するヘルパー
-    def mapPlayerSprite(f: AnimatedSprite2D -> AnimatedSprite2D,
-                        en: EngineNode[GameData]): EngineNode[GameData] =
-        match en {
-            case EngineNode.AnimSprite2DWithState(sprite, GameData.Player(pn, pd)) =>
-                let newSprite = f(sprite);
-                EngineNode.AnimSprite2DWithState(newSprite, GameData.Player({sprite = newSprite | pn}, pd))
-            case other => other
-        }
+    /// プレイヤーの sprite を変換する（EngineNode と pn#sprite を同時更新）
+    pub def mapSprite(f: AnimatedSprite2D -> AnimatedSprite2D,
+                      scene: Scene[GameData]): Scene[GameData] =
+        scene |> Scene.mapEngineNode(name() :: Nil, en ->
+            match en {
+                case EngineNode.AnimSprite2DWithState(sprite, GameData.Player(pn, pd)) =>
+                    let newSprite = f(sprite);
+                    EngineNode.AnimSprite2DWithState(newSprite, GameData.Player({sprite = newSprite | pn}, pd))
+                case other => other
+            })
 
     /// pn の area を Scene の子ノードに書き戻す（シリアライザ）
     pub def syncChildren(pn: PlayerNode, scene: Scene[GameData]): Scene[GameData] =
         scene |> Scene.mapEngineNode(name() :: areaName() :: Nil,
             EngineNode.mapArea2D(_ -> pn#area))
+
+    /// Scene から PlayerData を取り出す
+    pub def extractPlayerData(scene: Scene[GameData]): PlayerData =
+        match Scene.getState(name() :: Nil, scene) {
+            case Some(GameData.Player(_, pd)) => pd
+            case _ => bug!("player data not found")
+        }
+
+    /// PlayerData を Scene に書き戻す
+    pub def setPlayerData(pd: PlayerData, scene: Scene[GameData]): Scene[GameData] =
+        scene |> Scene.mapState(name() :: Nil, state ->
+            match state {
+                case GameData.Player(pn, _) => GameData.Player(pn, pd)
+                case other => other
+            })
 
     /// Scene から PlayerNode を構築する（デシリアライザ）
     pub def extractPlayerNode(scene: Scene[GameData]): PlayerNode =
@@ -171,21 +197,4 @@ mod PlayerScene {
         };
         { sprite = sprite, area = area }
 
-    // ========================================================================
-    // アニメーション制御
-    // ========================================================================
-
-    /// 入力方向に応じてアニメーション・反転・回転を設定する
-    /// 本家 Godot 準拠: 横移動は walk + flipH + flipV=false、縦移動は up + rotation（下向きで PI）
-    pub def setPlayerAnimation(dir: Vec2.Vec2, sprite: AnimatedSprite2D): AnimatedSprite2D =
-        if (dir#x != 0.0f32)
-            sprite |> AnimatedSprite2D.play(walkAnimation())
-                   |> AnimatedSprite2D.setFlipV(false)
-                   |> AnimatedSprite2D.setFlipH(dir#x < 0.0f32)
-                   |> rotation(0.0)
-        else if (dir#y != 0.0f32)
-            sprite |> AnimatedSprite2D.play(upAnimation())
-                   |> rotation(if (dir#y > 0.0f32) pi() else 0.0)
-        else
-            AnimatedSprite2D.stop(sprite)
 }

@@ -9,10 +9,10 @@ mod Engine {
     pub type alias TextureEntry = { name = String, path = String, hasAlpha = Bool }
 
     /// フォントアセットのマニフェストエントリ
-    pub type alias FontEntry = { name = String, path = String, fontSize = Float32 }
+    pub type alias FontEntry = { name = String, path = String, fontSize = Float64 }
 
     /// テクスチャ情報: GPU ハンドル ID + 元画像サイズ
-    pub type alias TextureInfo = { id = Int32, width = Float32, height = Float32 }
+    pub type alias TextureInfo = { id = Int32, width = Float64, height = Float64 }
 
     /// テクスチャの論理名 → TextureInfo
     pub type alias TextureRegistry = Map[String, TextureInfo]
@@ -32,7 +32,7 @@ mod Engine {
         texture = String,
         position = Vec2.Vec2,
         scale = Vec2.Vec2,
-        rotation = Float32,
+        rotation = Float64,
         color = Color,
         centered = Bool,
         uvOffset = Vec2.Vec2,
@@ -64,7 +64,7 @@ mod Engine {
     pub eff Game {
         def render(drawables: List[Drawable]): Unit
         def shouldClose(): Bool
-        def getDeltaTime(): Float32
+        def getDeltaTime(): Float64
         def isKeyPressed(key: Key): Bool
         def getFontAtlas(name: String): FontAtlas
         def getViewportRect(): Rect2.Rect2

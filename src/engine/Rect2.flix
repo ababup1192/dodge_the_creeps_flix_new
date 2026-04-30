@@ -31,12 +31,12 @@ mod Rect2 {
         Vec2.add(rect#position, rect#size)
 
     /// 矩形の面積を返す
-    pub def area(rect: Rect2): Float32 =
+    pub def area(rect: Rect2): Float64 =
         rect#size#x * rect#size#y
 
     /// 矩形の中心座標を返す
     pub def center(rect: Rect2): Vec2.Vec2 =
-        Vec2.add(rect#position, Vec2.div(rect#size, 2.0f32))
+        Vec2.add(rect#position, Vec2.div(rect#size, 2.0))
 
     // ========================================================================
     // 判定

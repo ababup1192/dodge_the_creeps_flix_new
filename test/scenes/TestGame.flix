@@ -8,10 +8,10 @@ def withMockEngine(f: Unit -> a \ ef + Engine.Game): a \ ef =
     run f() with handler Engine.Game {
         def render(_, k) = k(())
         def shouldClose(k) = k(false)
-        def getDeltaTime(k) = k(0.016f32)
+        def getDeltaTime(k) = k(0.016)
         def isKeyPressed(_, k) = k(false)
         def getFontAtlas(_, k) = k(testFontAtlas())
-        def getViewportRect(k) = k(Rect2.fromSize({x = 480.0f32, y = 720.0f32}))
+        def getViewportRect(k) = k(Rect2.fromSize({x = 480.0, y = 720.0}))
     }
 
 /// 指定キーが押されている Engine.Game ハンドラ
@@ -19,17 +19,17 @@ def withKeysPressed(keys: Set[Engine.Key], f: Unit -> a \ ef + Engine.Game): a \
     run f() with handler Engine.Game {
         def render(_, k) = k(())
         def shouldClose(k) = k(false)
-        def getDeltaTime(k) = k(0.016f32)
+        def getDeltaTime(k) = k(0.016)
         def isKeyPressed(key, k) = k(Set.memberOf(key, keys))
         def getFontAtlas(_, k) = k(testFontAtlas())
-        def getViewportRect(k) = k(Rect2.fromSize({x = 480.0f32, y = 720.0f32}))
+        def getViewportRect(k) = k(Rect2.fromSize({x = 480.0, y = 720.0}))
     }
 
 /// テスト用のダミー FontAtlas（空のグリフマップ）
 def testFontAtlas(): FontAtlas = {
     textureName = "font_test",
-    fontSize = 32.0f32,
-    textureSize = 512.0f32,
+    fontSize = 32.0,
+    textureSize = 512.0,
     glyphs = Map.empty()
 }
 
@@ -44,7 +44,7 @@ def testReadyScene(): Scene[GameData] =
     withMockEngine(() -> Scene.readyAll(testScene()))
 
 /// Vec2 をタプルに変換するヘルパー
-def vecToTuple(v: Vec2.Vec2): (Float32, Float32) = (v#x, v#y)
+def vecToTuple(v: Vec2.Vec2): (Float64, Float64) = (v#x, v#y)
 
 // ========================================================================
 // buildState: ノード数・構造
@@ -68,7 +68,7 @@ def testBuildSceneRootCount(): Unit \ Assert =
 @Test
 def testPlayerInitialPosition(): Unit \ Assert =
     let pos = Scene.globalPosition("player", testScene());
-    Assert.assertEq(expected = (240.0f32, 360.0f32), vecToTuple(pos))
+    Assert.assertEq(expected = (240.0, 360.0), vecToTuple(pos))
 
 /// プレイヤーは可視状態
 @Test
@@ -95,7 +95,7 @@ def testPlayerWalkAnimation(): Unit \ Assert =
 def testPlayerInitialVelocity(): Unit \ Assert =
     match Scene.get("player", testScene()) {
         case Some(GameData.Player(_, pd)) =>
-            Assert.assertEq(expected = (0.0f32, 0.0f32), vecToTuple(pd#velocity))
+            Assert.assertEq(expected = (0.0, 0.0), vecToTuple(pd#velocity))
         case _ => bug!("player state mismatch")
     }
 
@@ -129,37 +129,37 @@ def testAnimSpriteLoops(): Unit \ Assert =
 @Test
 def testInputDirectionRight(): Unit \ Assert =
     let dir = withKeysPressed(Set#{Engine.Key.D}, () -> Game.readInputDirection());
-    Assert.assertEq(expected = (1.0f32, 0.0f32), vecToTuple(dir))
+    Assert.assertEq(expected = (1.0, 0.0), vecToTuple(dir))
 
 /// A キーで左方向 (-1, 0)
 @Test
 def testInputDirectionLeft(): Unit \ Assert =
     let dir = withKeysPressed(Set#{Engine.Key.A}, () -> Game.readInputDirection());
-    Assert.assertEq(expected = (-1.0f32, 0.0f32), vecToTuple(dir))
+    Assert.assertEq(expected = (-1.0, 0.0), vecToTuple(dir))
 
 /// W キーで上方向 (0, -1)
 @Test
 def testInputDirectionUp(): Unit \ Assert =
     let dir = withKeysPressed(Set#{Engine.Key.W}, () -> Game.readInputDirection());
-    Assert.assertEq(expected = (0.0f32, -1.0f32), vecToTuple(dir))
+    Assert.assertEq(expected = (0.0, -1.0), vecToTuple(dir))
 
 /// S キーで下方向 (0, 1)
 @Test
 def testInputDirectionDown(): Unit \ Assert =
     let dir = withKeysPressed(Set#{Engine.Key.S}, () -> Game.readInputDirection());
-    Assert.assertEq(expected = (0.0f32, 1.0f32), vecToTuple(dir))
+    Assert.assertEq(expected = (0.0, 1.0), vecToTuple(dir))
 
 /// 矢印キーも対応
 @Test
 def testInputDirectionArrow(): Unit \ Assert =
     let dir = withKeysPressed(Set#{Engine.Key.Right}, () -> Game.readInputDirection());
-    Assert.assertEq(expected = (1.0f32, 0.0f32), vecToTuple(dir))
+    Assert.assertEq(expected = (1.0, 0.0), vecToTuple(dir))
 
 /// キーなしでゼロベクトル
 @Test
 def testInputDirectionNone(): Unit \ Assert =
     let dir = withMockEngine(() -> Game.readInputDirection());
-    Assert.assertEq(expected = (0.0f32, 0.0f32), vecToTuple(dir))
+    Assert.assertEq(expected = (0.0, 0.0), vecToTuple(dir))
 
 // ========================================================================
 // applyInput: 速度・アニメーション設定
@@ -168,10 +168,10 @@ def testInputDirectionNone(): Unit \ Assert =
 /// 右方向に速度が設定される
 @Test
 def testApplyInputSetsVelocity(): Unit \ Assert =
-    let scene = PlayerScene.applyInput({x = 1.0f32, y = 0.0f32}, testScene());
+    let scene = PlayerScene.applyInput({x = 1.0, y = 0.0}, testScene());
     match Scene.get("player", scene) {
         case Some(GameData.Player(_, pd)) =>
-            Assert.assertEq(expected = (400.0f32, 0.0f32), vecToTuple(pd#velocity))
+            Assert.assertEq(expected = (400.0, 0.0), vecToTuple(pd#velocity))
         case _ => bug!("player state mismatch")
     }
 
@@ -181,14 +181,14 @@ def testApplyInputZeroVelocity(): Unit \ Assert =
     let scene = PlayerScene.applyInput(Vec2.zero(), testScene());
     match Scene.get("player", scene) {
         case Some(GameData.Player(_, pd)) =>
-            Assert.assertEq(expected = (0.0f32, 0.0f32), vecToTuple(pd#velocity))
+            Assert.assertEq(expected = (0.0, 0.0), vecToTuple(pd#velocity))
         case _ => bug!("player state mismatch")
     }
 
 /// 右方向で walk アニメーションが再生される
 @Test
 def testApplyInputWalkAnimation(): Unit \ Assert =
-    let scene = PlayerScene.applyInput({x = 1.0f32, y = 0.0f32}, testScene());
+    let scene = PlayerScene.applyInput({x = 1.0, y = 0.0}, testScene());
     match Scene.getEngineNode("player" :: Nil, scene) {
         case Some(EngineNode.AnimSprite2DWithState(sprite, _)) =>
             Assert.assertEq(expected = "walk", AnimatedSprite2D.getCurrentAnimation(sprite))
@@ -198,7 +198,7 @@ def testApplyInputWalkAnimation(): Unit \ Assert =
 /// 上方向で up アニメーションが再生される
 @Test
 def testApplyInputUpAnimation(): Unit \ Assert =
-    let scene = PlayerScene.applyInput({x = 0.0f32, y = -1.0f32}, testScene());
+    let scene = PlayerScene.applyInput({x = 0.0, y = -1.0}, testScene());
     match Scene.getEngineNode("player" :: Nil, scene) {
         case Some(EngineNode.AnimSprite2DWithState(sprite, _)) =>
             Assert.assertEq(expected = "up", AnimatedSprite2D.getCurrentAnimation(sprite))
@@ -219,7 +219,7 @@ def testApplyInputStopsAnimation(): Unit \ Assert =
 /// 左方向で flipH=true になる
 @Test
 def testApplyInputFlipH(): Unit \ Assert =
-    let scene = PlayerScene.applyInput({x = -1.0f32, y = 0.0f32}, testScene());
+    let scene = PlayerScene.applyInput({x = -1.0, y = 0.0}, testScene());
     match Scene.getEngineNode("player" :: Nil, scene) {
         case Some(EngineNode.AnimSprite2DWithState(sprite, _)) =>
             let AnimatedSprite2D.AnimatedSprite2D(r) = sprite;
@@ -230,7 +230,7 @@ def testApplyInputFlipH(): Unit \ Assert =
 /// 右方向で rotation=0（横移動時は回転リセット）
 @Test
 def testApplyInputWalkRotationZero(): Unit \ Assert =
-    let scene = PlayerScene.applyInput({x = 1.0f32, y = 0.0f32}, testScene());
+    let scene = PlayerScene.applyInput({x = 1.0, y = 0.0}, testScene());
     match Scene.getEngineNode("player" :: Nil, scene) {
         case Some(engineNode) =>
             Assert.assertEq(expected = 0.0, Node2D.getRotation(engineNode))
@@ -240,7 +240,7 @@ def testApplyInputWalkRotationZero(): Unit \ Assert =
 /// 下方向で rotation=PI
 @Test
 def testApplyInputDownRotation(): Unit \ Assert =
-    let scene = PlayerScene.applyInput({x = 0.0f32, y = 1.0f32}, testScene());
+    let scene = PlayerScene.applyInput({x = 0.0, y = 1.0}, testScene());
     match Scene.getEngineNode("player" :: Nil, scene) {
         case Some(engineNode) =>
             Assert.assertEq(expected = 3.14159265358979, Node2D.getRotation(engineNode))
@@ -250,7 +250,7 @@ def testApplyInputDownRotation(): Unit \ Assert =
 /// 上方向で rotation=0
 @Test
 def testApplyInputUpRotation(): Unit \ Assert =
-    let scene = PlayerScene.applyInput({x = 0.0f32, y = -1.0f32}, testScene());
+    let scene = PlayerScene.applyInput({x = 0.0, y = -1.0}, testScene());
     match Scene.getEngineNode("player" :: Nil, scene) {
         case Some(engineNode) =>
             Assert.assertEq(expected = 0.0, Node2D.getRotation(engineNode))
@@ -269,17 +269,17 @@ def testPlayerProcessMoves(): Unit \ Assert =
         |> Scene.mapState("player" :: Nil, state ->
             match state {
                 case GameData.Player(pn, pd) =>
-                    GameData.Player(pn, {velocity = {x = 400.0f32, y = 0.0f32} | pd})
+                    GameData.Player(pn, {velocity = {x = 400.0, y = 0.0} | pd})
                 case other => other
             });
     let pos = scene |> Scene.processAll(0.1, false) |> Scene.globalPosition("player");
-    Assert.assertEq(expected = (280.0f32, 360.0f32), vecToTuple(pos))
+    Assert.assertEq(expected = (280.0, 360.0), vecToTuple(pos))
 
 /// 速度ゼロのとき process で移動しない
 @Test
 def testPlayerProcessStays(): Unit \ Assert =
     let pos = testReadyScene() |> Scene.processAll(0.1, false) |> Scene.globalPosition("player");
-    Assert.assertEq(expected = (240.0f32, 360.0f32), vecToTuple(pos))
+    Assert.assertEq(expected = (240.0, 360.0), vecToTuple(pos))
 
 /// 画面右端でクランプされる
 @Test
@@ -288,11 +288,11 @@ def testPlayerClampRight(): Unit \ Assert =
         |> Scene.mapState("player" :: Nil, state ->
             match state {
                 case GameData.Player(pn, pd) =>
-                    GameData.Player(pn, {velocity = {x = 400.0f32, y = 0.0f32} | pd})
+                    GameData.Player(pn, {velocity = {x = 400.0, y = 0.0} | pd})
                 case other => other
             });
     let pos = scene |> Scene.processAll(1.0, false) |> Scene.globalPosition("player");
-    Assert.assertEq(expected = (480.0f32, 360.0f32), vecToTuple(pos))
+    Assert.assertEq(expected = (480.0, 360.0), vecToTuple(pos))
 
 /// 画面左端でクランプされる
 @Test
@@ -301,11 +301,11 @@ def testPlayerClampLeft(): Unit \ Assert =
         |> Scene.mapState("player" :: Nil, state ->
             match state {
                 case GameData.Player(pn, pd) =>
-                    GameData.Player(pn, {velocity = {x = -400.0f32, y = 0.0f32} | pd})
+                    GameData.Player(pn, {velocity = {x = -400.0, y = 0.0} | pd})
                 case other => other
             });
     let pos = scene |> Scene.processAll(1.0, false) |> Scene.globalPosition("player");
-    Assert.assertEq(expected = (0.0f32, 360.0f32), vecToTuple(pos))
+    Assert.assertEq(expected = (0.0, 360.0), vecToTuple(pos))
 
 // ========================================================================
 // setPlayerAnimation: アニメーション切り替え
@@ -316,7 +316,7 @@ def testPlayerClampLeft(): Unit \ Assert =
 def testSwitchAnimKeepsFrame(): Unit \ Assert =
     let scene = testScene()
         |> Scene.processAll(0.2, false)
-        |> PlayerScene.applyInput({x = 1.0f32, y = 0.0f32});
+        |> PlayerScene.applyInput({x = 1.0, y = 0.0});
     match Scene.getEngineNode("player" :: Nil, scene) {
         case Some(EngineNode.AnimSprite2DWithState(sprite, _)) =>
             Assert.assertEq(expected = "playerGrey_walk2", AnimatedSprite2D.currentTexture(sprite))
@@ -328,7 +328,7 @@ def testSwitchAnimKeepsFrame(): Unit \ Assert =
 def testSwitchAnimResetsFrame(): Unit \ Assert =
     let scene = testScene()
         |> Scene.processAll(0.2, false)
-        |> PlayerScene.applyInput({x = 0.0f32, y = -1.0f32});
+        |> PlayerScene.applyInput({x = 0.0, y = -1.0});
     match Scene.getEngineNode("player" :: Nil, scene) {
         case Some(EngineNode.AnimSprite2DWithState(sprite, _)) =>
             Assert.assertEq(
@@ -348,7 +348,7 @@ def testReadySetsScreenSize(): Unit \ Assert =
     let scene = withMockEngine(() -> Scene.readyAll(testScene()));
     match Scene.get("player", scene) {
         case Some(GameData.Player(_, pd)) =>
-            Assert.assertEq(expected = (480.0f32, 720.0f32), vecToTuple(pd#screenSize))
+            Assert.assertEq(expected = (480.0, 720.0), vecToTuple(pd#screenSize))
         case _ => bug!("player state mismatch")
     }
 
@@ -369,7 +369,7 @@ def testReadyHidesPlayer(): Unit \ Assert =
 @Test
 def testStartShowsPlayer(): Unit \ Assert =
     let scene = testReadyScene()
-        |> PlayerScene.start({x = 100.0f32, y = 200.0f32});
+        |> PlayerScene.start({x = 100.0, y = 200.0});
     match Scene.getEngineNode("player" :: Nil, scene) {
         case Some(engineNode) => Assert.assertTrue(CanvasItem.isVisible(engineNode))
         case None => bug!("player not found")
@@ -379,9 +379,9 @@ def testStartShowsPlayer(): Unit \ Assert =
 @Test
 def testStartSetsPosition(): Unit \ Assert =
     let scene = testReadyScene()
-        |> PlayerScene.start({x = 100.0f32, y = 200.0f32});
+        |> PlayerScene.start({x = 100.0, y = 200.0});
     let pos = Scene.globalPosition("player", scene);
-    Assert.assertEq(expected = (100.0f32, 200.0f32), vecToTuple(pos))
+    Assert.assertEq(expected = (100.0, 200.0), vecToTuple(pos))
 
 // ========================================================================
 // Area2D 子ノード

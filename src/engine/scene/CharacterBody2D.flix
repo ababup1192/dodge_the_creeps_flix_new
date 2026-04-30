@@ -18,21 +18,21 @@ pub enum CharacterBody2D {
         scale = Vec2.Vec2,    // スケール
         skew = Float64,       // スキュー
         velocity = Vec2.Vec2, // 現在の速度ベクトル
-        moveSpeed = Float32   // 最大移動速度
+        moveSpeed = Float64   // 最大移動速度
     })
 }
 
 mod CharacterBody2D {
 
     /// デフォルト値で CharacterBody2D を生成する
-    pub def make(position: Vec2.Vec2, moveSpeed: {moveSpeed = Float32}): CharacterBody2D =
+    pub def make(position: Vec2.Vec2, moveSpeed: {moveSpeed = Float64}): CharacterBody2D =
         CharacterBody2D.CharacterBody2D({
             visible = true,
             zIndex = 0,
             modulate = {r = 1.0f32, g = 1.0f32, b = 1.0f32},
             position = position,
             rotation = 0.0,
-            scale = {x = 1.0f32, y = 1.0f32},
+            scale = {x = 1.0, y = 1.0},
             skew = 0.0,
             velocity = Vec2.zero(),
             moveSpeed = moveSpeed#moveSpeed
@@ -49,7 +49,7 @@ mod CharacterBody2D {
         CharacterBody2D.CharacterBody2D({velocity = velocity | r})
 
     /// 最大移動速度を取得する
-    pub def getMoveSpeed(body: CharacterBody2D): Float32 =
+    pub def getMoveSpeed(body: CharacterBody2D): Float64 =
         let CharacterBody2D.CharacterBody2D(r) = body;
         r#moveSpeed
 }

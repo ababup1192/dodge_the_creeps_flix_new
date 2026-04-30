@@ -61,15 +61,15 @@ mod Game {
     /// WASD / 矢印キーから方向ベクトルを返す
     pub def readInputDirection(): Vec2.Vec2 \ Engine.Game =
         let xDir =
-            (if (Engine.Game.isKeyPressed(Engine.Key.D))      1.0f32 else 0f32) +
-            (if (Engine.Game.isKeyPressed(Engine.Key.Right))   1.0f32 else 0.0f32) +
-            (if (Engine.Game.isKeyPressed(Engine.Key.A))      -1.0f32 else 0.0f32) +
-            (if (Engine.Game.isKeyPressed(Engine.Key.Left))   -1.0f32 else 0.0f32);
+            (if (Engine.Game.isKeyPressed(Engine.Key.D))      1.0 else 0.0) +
+            (if (Engine.Game.isKeyPressed(Engine.Key.Right))   1.0 else 0.0) +
+            (if (Engine.Game.isKeyPressed(Engine.Key.A))      -1.0 else 0.0) +
+            (if (Engine.Game.isKeyPressed(Engine.Key.Left))   -1.0 else 0.0);
         let yDir =
-            (if (Engine.Game.isKeyPressed(Engine.Key.S))      1.0f32 else 0.0f32) +
-            (if (Engine.Game.isKeyPressed(Engine.Key.Down))    1.0f32 else 0.0f32) +
-            (if (Engine.Game.isKeyPressed(Engine.Key.W))      -1.0f32 else 0.0f32) +
-            (if (Engine.Game.isKeyPressed(Engine.Key.Up))     -1.0f32 else 0.0f32);
+            (if (Engine.Game.isKeyPressed(Engine.Key.S))      1.0 else 0.0) +
+            (if (Engine.Game.isKeyPressed(Engine.Key.Down))    1.0 else 0.0) +
+            (if (Engine.Game.isKeyPressed(Engine.Key.W))      -1.0 else 0.0) +
+            (if (Engine.Game.isKeyPressed(Engine.Key.Up))     -1.0 else 0.0);
         {x = xDir, y = yDir}
 
     // ========================================================================
@@ -80,7 +80,7 @@ mod Game {
         let state = buildState(fontAtlas);
         let readyState: GameState = { scene = Scene.readyAll(state#scene) | state };
         let startedState: GameState = {
-            scene = PlayerScene.start({x = 240.0f32, y = 360.0f32}, readyState#scene)
+            scene = PlayerScene.start({x = 240.0, y = 360.0}, readyState#scene)
             | readyState };
         gameLoop(fontAtlas, startedState)
 

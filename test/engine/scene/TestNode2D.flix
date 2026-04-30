@@ -10,16 +10,16 @@ mod TestNode2D {
     /// テスト用ヘルパー: 原点に配置したデフォルト Sprite2D を作る
     def mkSprite(): Sprite2D =
         Sprite2D.Sprite2D({
-            position = {x = 0.0f32, y = 0.0f32},
+            position = {x = 0.0, y = 0.0},
             rotation = 0.0,
-            scale = {x = 1.0f32, y = 1.0f32},
+            scale = {x = 1.0, y = 1.0},
             skew = 0.0,
             visible = true,
             zIndex = 0,
             modulate = {r = 1.0f32, g = 1.0f32, b = 1.0f32},
             texture = "",
             centered = true,
-            offset = {x = 0.0f32, y = 0.0f32},
+            offset = {x = 0.0, y = 0.0},
             flipH = false,
             flipV = false
         })
@@ -29,10 +29,6 @@ mod TestNode2D {
         let diff = a - b;
         let d = if (diff < 0.0) -1.0 * diff else diff;
         d < 0.001
-
-    /// Float32 の近似比較（許容誤差 0.001）
-    def approx32(a: Float32, b: Float32): Bool =
-        Float32.abs(a - b) < 0.001f32
 
     // ========================================================================
     // translate
@@ -44,9 +40,9 @@ mod TestNode2D {
     ///
     @Test
     def testTranslate(): Unit \ Assert =
-        let s = mkSprite() |> Node2D.translate({x = 3.0f32, y = 4.0f32});
+        let s = mkSprite() |> Node2D.translate({x = 3.0, y = 4.0});
         let pos = Node2D.getPosition(s);
-        Assert.assertTrue(approx32(pos#x, 3.0f32) and approx32(pos#y, 4.0f32))
+        Assert.assertTrue(approx(pos#x, 3.0) and approx(pos#y, 4.0))
 
     /// translate を連続で呼ぶと加算が累積する
     ///
@@ -55,10 +51,10 @@ mod TestNode2D {
     @Test
     def testTranslateAccumulates(): Unit \ Assert =
         let s = mkSprite()
-            |> Node2D.translate({x = 1.0f32, y = 2.0f32})
-            |> Node2D.translate({x = 3.0f32, y = 4.0f32});
+            |> Node2D.translate({x = 1.0, y = 2.0})
+            |> Node2D.translate({x = 3.0, y = 4.0});
         let pos = Node2D.getPosition(s);
-        Assert.assertTrue(approx32(pos#x, 4.0f32) and approx32(pos#y, 6.0f32))
+        Assert.assertTrue(approx(pos#x, 4.0) and approx(pos#y, 6.0))
 
     // ========================================================================
     // rotate
@@ -92,19 +88,19 @@ mod TestNode2D {
     @Test
     def testApplyScale(): Unit \ Assert =
         let s = mkSprite()
-            |> Node2D.setScale({x = 2.0f32, y = 3.0f32})
-            |> Node2D.applyScale({x = 0.5f32, y = 2.0f32});
+            |> Node2D.setScale({x = 2.0, y = 3.0})
+            |> Node2D.applyScale({x = 0.5, y = 2.0});
         let sc = Node2D.getScale(s);
-        Assert.assertTrue(approx32(sc#x, 1.0f32) and approx32(sc#y, 6.0f32))
+        Assert.assertTrue(approx(sc#x, 1.0) and approx(sc#y, 6.0))
 
     /// applyScale に (1,1) を渡すとスケールは変化しない
     @Test
     def testApplyScaleIdentity(): Unit \ Assert =
         let s = mkSprite()
-            |> Node2D.setScale({x = 3.0f32, y = 5.0f32})
-            |> Node2D.applyScale({x = 1.0f32, y = 1.0f32});
+            |> Node2D.setScale({x = 3.0, y = 5.0})
+            |> Node2D.applyScale({x = 1.0, y = 1.0});
         let sc = Node2D.getScale(s);
-        Assert.assertTrue(approx32(sc#x, 3.0f32) and approx32(sc#y, 5.0f32))
+        Assert.assertTrue(approx(sc#x, 3.0) and approx(sc#y, 5.0))
 
     // ========================================================================
     // getAngleTo
@@ -116,7 +112,7 @@ mod TestNode2D {
     ///
     @Test
     def testGetAngleToRight(): Unit \ Assert =
-        let angle = Node2D.getAngleTo({x = 1.0f32, y = 0.0f32}, mkSprite());
+        let angle = Node2D.getAngleTo({x = 1.0, y = 0.0}, mkSprite());
         Assert.assertTrue(approx(angle, 0.0))
 
     /// 原点から +Y 方向 (0,1) への角度は PI/2
@@ -128,7 +124,7 @@ mod TestNode2D {
     @Test
     def testGetAngleToUp(): Unit \ Assert =
         let pi = 3.14159265;
-        let angle = Node2D.getAngleTo({x = 0.0f32, y = 1.0f32}, mkSprite());
+        let angle = Node2D.getAngleTo({x = 0.0, y = 1.0}, mkSprite());
         Assert.assertTrue(approx(angle, pi / 2.0))
 
     /// ノードが原点以外にいる場合、差分ベクトルで角度を計算する
@@ -137,8 +133,8 @@ mod TestNode2D {
     ///
     @Test
     def testGetAngleToFromOffset(): Unit \ Assert =
-        let s = mkSprite() |> Node2D.setPosition({x = 1.0f32, y = 1.0f32});
-        let angle = Node2D.getAngleTo({x = 2.0f32, y = 1.0f32}, s);
+        let s = mkSprite() |> Node2D.setPosition({x = 1.0, y = 1.0});
+        let angle = Node2D.getAngleTo({x = 2.0, y = 1.0}, s);
         Assert.assertTrue(approx(angle, 0.0))
 
     // ========================================================================
@@ -155,6 +151,6 @@ mod TestNode2D {
     @Test
     def testLookAt(): Unit \ Assert =
         let pi = 3.14159265;
-        let s = mkSprite() |> Node2D.lookAt({x = 0.0f32, y = 1.0f32});
+        let s = mkSprite() |> Node2D.lookAt({x = 0.0, y = 1.0});
         Assert.assertTrue(approx(Node2D.getRotation(s), pi / 2.0))
 }

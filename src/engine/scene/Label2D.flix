@@ -9,7 +9,7 @@ pub enum Label2D {
     case Label2D({
         text = String,
         fontAtlas = FontAtlas,
-        fontSize = Float32,
+        fontSize = Float64,
         centered = Bool,
         position = Vec2.Vec2,
         rotation = Float64,
@@ -23,7 +23,7 @@ pub enum Label2D {
 
 mod Label2D {
     /// テキストとフォントアトラスから Label2D を生成する
-    pub def make(text: String, fontAtlas: FontAtlas, fontSize: Float32): Label2D =
+    pub def make(text: String, fontAtlas: FontAtlas, fontSize: Float64): Label2D =
         Label2D.Label2D({
             text = text,
             fontAtlas = fontAtlas,
@@ -31,7 +31,7 @@ mod Label2D {
             centered = false,
             position = Vec2.zero(),
             rotation = 0.0,
-            scale = {x = 1.0f32, y = 1.0f32},
+            scale = {x = 1.0, y = 1.0},
             skew = 0.0,
             visible = true,
             zIndex = 0,
@@ -65,16 +65,16 @@ mod Label2D {
             let cp = TextLayout.charToCodePoint(ch);
             match Map.get(cp, atlas#glyphs) {
                 case Some(gm) => gm#advance
-                case None => 0.0f32
+                case None => 0.0
             }
         }, chars);
         // センタリングオフセット
         let offsetX = if (r#centered)
             TextLayout.centerOffset(TextLayout.totalAdvance(advances), scale)
-        else 0.0f32;
+        else 0.0;
         // レイアウト位置計算
         let lineHeight = r#fontSize * TextLayout.lineHeightMultiplier();
-        let positions = TextLayout.layoutPositions(advances, 0.0f32, scale, lineHeight);
+        let positions = TextLayout.layoutPositions(advances, 0.0, scale, lineHeight);
         // グリフごとに Drawable を生成
         let charPositions = List.zip(chars, positions);
         List.filterMap(pair -> {
@@ -85,12 +85,12 @@ mod Label2D {
                     let qb = TextLayout.glyphQuadBounds(penPos, gm, scale, globalPos, offsetX);
                     let w = qb#x1 - qb#x0;
                     let h = qb#y1 - qb#y0;
-                    if (w <= 0.0f32 or h <= 0.0f32) None
+                    if (w <= 0.0 or h <= 0.0) None
                     else Some({
                         texture = atlas#textureName,
                         position = {x = qb#x0, y = qb#y0},
                         scale = {x = w / atlas#textureSize, y = h / atlas#textureSize},
-                        rotation = 0.0f32,
+                        rotation = 0.0,
                         color = r#modulate,
                         centered = false,
                         uvOffset = {x = gm#s0, y = gm#t0},

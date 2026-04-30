@@ -1,11 +1,11 @@
 // Tests for AreaEvent module
 
 /// テスト用ヘルパー: 矩形 Area2D を EngineNode[Unit] として作る
-def rectAreaNode(x: Float32, y: Float32, w: Float32, h: Float32): EngineNode[Unit] =
+def rectAreaNode(x: Float64, y: Float64, w: Float64, h: Float64): EngineNode[Unit] =
     EngineNode.Area2DWithState(Area2D.make({x = x, y = y}, CollisionShape2D.RectShape2D({width = w, height = h})), ())
 
 /// テスト用ヘルパー: 矩形 Area2D の EngineNode[Unit] を設定付きで作る
-def rectAreaNodeWith(x: Float32, y: Float32, w: Float32, h: Float32,
+def rectAreaNodeWith(x: Float64, y: Float64, w: Float64, h: Float64,
                      monitoring: Bool, monitorable: Bool): EngineNode[Unit] =
     EngineNode.Area2DWithState(
         Area2D.make({x = x, y = y}, CollisionShape2D.RectShape2D({width = w, height = h}))
@@ -13,9 +13,9 @@ def rectAreaNodeWith(x: Float32, y: Float32, w: Float32, h: Float32,
             |> Area2D.setMonitorable(monitorable), ())
 
 /// テスト用ヘルパー: 衝突形状なしの Area2D EngineNode[Unit] を作る
-def noShapeAreaNode(x: Float32, y: Float32): EngineNode[Unit] =
+def noShapeAreaNode(x: Float64, y: Float64): EngineNode[Unit] =
     EngineNode.Area2DWithState(
-        Area2D.make({x = x, y = y}, CollisionShape2D.RectShape2D({width = 10.0f32, height = 10.0f32}))
+        Area2D.make({x = x, y = y}, CollisionShape2D.RectShape2D({width = 10.0, height = 10.0}))
             |> Area2D.setCollisionShape(None), ())
 
 // ── processAndEmitHandled テスト用の状態型 ──
@@ -28,7 +28,7 @@ enum TestAreaState with Eq {
 instance Node[TestAreaState] {}
 
 /// テスト用ヘルパー: TestAreaState 用の矩形 Area2D EngineNode を作る
-def testStateAreaNode(x: Float32, y: Float32, w: Float32, h: Float32, state: TestAreaState): EngineNode[TestAreaState] =
+def testStateAreaNode(x: Float64, y: Float64, w: Float64, h: Float64, state: TestAreaState): EngineNode[TestAreaState] =
     EngineNode.Area2DWithState(Area2D.make({x = x, y = y}, CollisionShape2D.RectShape2D({width = w, height = h})), state)
 
 instance AreaHandler[TestAreaState] {
@@ -62,8 +62,8 @@ instance Node[Unit] {}
 @Test
 def testDetectOverlapsTwoOverlapping(): Unit \ Assert =
     let scene: Scene[Unit] = Scene.empty()
-        |> Scene.addNode("a", rectAreaNode(0.0f32, 0.0f32, 10.0f32, 10.0f32))
-        |> Scene.addNode("b", rectAreaNode(5.0f32, 0.0f32, 10.0f32, 10.0f32));
+        |> Scene.addNode("a", rectAreaNode(0.0, 0.0, 10.0, 10.0))
+        |> Scene.addNode("b", rectAreaNode(5.0, 0.0, 10.0, 10.0));
     let overlaps = AreaEvent.detectOverlaps(scene);
     Assert.assertEq(expected = 2, List.length(overlaps))
 
@@ -71,8 +71,8 @@ def testDetectOverlapsTwoOverlapping(): Unit \ Assert =
 @Test
 def testDetectOverlapsNoOverlap(): Unit \ Assert =
     let scene: Scene[Unit] = Scene.empty()
-        |> Scene.addNode("a", rectAreaNode(0.0f32, 0.0f32, 4.0f32, 4.0f32))
-        |> Scene.addNode("b", rectAreaNode(100.0f32, 100.0f32, 4.0f32, 4.0f32));
+        |> Scene.addNode("a", rectAreaNode(0.0, 0.0, 4.0, 4.0))
+        |> Scene.addNode("b", rectAreaNode(100.0, 100.0, 4.0, 4.0));
     let overlaps = AreaEvent.detectOverlaps(scene);
     Assert.assertEq(expected = 0, List.length(overlaps))
 
@@ -80,8 +80,8 @@ def testDetectOverlapsNoOverlap(): Unit \ Assert =
 @Test
 def testDetectOverlapsMonitoringOff(): Unit \ Assert =
     let scene: Scene[Unit] = Scene.empty()
-        |> Scene.addNode("a", rectAreaNodeWith(0.0f32, 0.0f32, 10.0f32, 10.0f32, false, true))
-        |> Scene.addNode("b", rectAreaNode(5.0f32, 0.0f32, 10.0f32, 10.0f32));
+        |> Scene.addNode("a", rectAreaNodeWith(0.0, 0.0, 10.0, 10.0, false, true))
+        |> Scene.addNode("b", rectAreaNode(5.0, 0.0, 10.0, 10.0));
     let overlaps = AreaEvent.detectOverlaps(scene);
     Assert.assertEq(expected = 1, List.length(overlaps))
 
@@ -89,8 +89,8 @@ def testDetectOverlapsMonitoringOff(): Unit \ Assert =
 @Test
 def testDetectOverlapsMonitorableOff(): Unit \ Assert =
     let scene: Scene[Unit] = Scene.empty()
-        |> Scene.addNode("a", rectAreaNode(0.0f32, 0.0f32, 10.0f32, 10.0f32))
-        |> Scene.addNode("b", rectAreaNodeWith(5.0f32, 0.0f32, 10.0f32, 10.0f32, true, false));
+        |> Scene.addNode("a", rectAreaNode(0.0, 0.0, 10.0, 10.0))
+        |> Scene.addNode("b", rectAreaNodeWith(5.0, 0.0, 10.0, 10.0, true, false));
     let overlaps = AreaEvent.detectOverlaps(scene);
     Assert.assertEq(expected = 1, List.length(overlaps))
 
@@ -98,8 +98,8 @@ def testDetectOverlapsMonitorableOff(): Unit \ Assert =
 @Test
 def testDetectOverlapsBothOff(): Unit \ Assert =
     let scene: Scene[Unit] = Scene.empty()
-        |> Scene.addNode("a", rectAreaNodeWith(0.0f32, 0.0f32, 10.0f32, 10.0f32, false, false))
-        |> Scene.addNode("b", rectAreaNodeWith(5.0f32, 0.0f32, 10.0f32, 10.0f32, false, false));
+        |> Scene.addNode("a", rectAreaNodeWith(0.0, 0.0, 10.0, 10.0, false, false))
+        |> Scene.addNode("b", rectAreaNodeWith(5.0, 0.0, 10.0, 10.0, false, false));
     let overlaps = AreaEvent.detectOverlaps(scene);
     Assert.assertEq(expected = 0, List.length(overlaps))
 
@@ -107,9 +107,9 @@ def testDetectOverlapsBothOff(): Unit \ Assert =
 @Test
 def testDetectOverlapsThreeNodes(): Unit \ Assert =
     let scene: Scene[Unit] = Scene.empty()
-        |> Scene.addNode("a", rectAreaNode(0.0f32, 0.0f32, 10.0f32, 10.0f32))
-        |> Scene.addNode("b", rectAreaNode(5.0f32, 0.0f32, 10.0f32, 10.0f32))
-        |> Scene.addNode("c", rectAreaNode(3.0f32, 0.0f32, 4.0f32, 4.0f32));
+        |> Scene.addNode("a", rectAreaNode(0.0, 0.0, 10.0, 10.0))
+        |> Scene.addNode("b", rectAreaNode(5.0, 0.0, 10.0, 10.0))
+        |> Scene.addNode("c", rectAreaNode(3.0, 0.0, 4.0, 4.0));
     let overlaps = AreaEvent.detectOverlaps(scene);
     Assert.assertEq(expected = 6, List.length(overlaps))
 
@@ -117,8 +117,8 @@ def testDetectOverlapsThreeNodes(): Unit \ Assert =
 @Test
 def testDetectOverlapsNoShape(): Unit \ Assert =
     let scene: Scene[Unit] = Scene.empty()
-        |> Scene.addNode("a", rectAreaNode(0.0f32, 0.0f32, 10.0f32, 10.0f32))
-        |> Scene.addNode("b", noShapeAreaNode(5.0f32, 0.0f32));
+        |> Scene.addNode("a", rectAreaNode(0.0, 0.0, 10.0, 10.0))
+        |> Scene.addNode("b", noShapeAreaNode(5.0, 0.0));
     let overlaps = AreaEvent.detectOverlaps(scene);
     Assert.assertEq(expected = 0, List.length(overlaps))
 
@@ -126,9 +126,9 @@ def testDetectOverlapsNoShape(): Unit \ Assert =
 @Test
 def testDetectOverlapsWithParentChild(): Unit \ Assert =
     let scene: Scene[Unit] = Scene.empty()
-        |> Scene.addNode("parent", rectAreaNode(100.0f32, 0.0f32, 4.0f32, 4.0f32))
-        |> Scene.addChild("parent", "child", rectAreaNode(0.0f32, 0.0f32, 4.0f32, 4.0f32))
-        |> Scene.addNode("other", rectAreaNode(101.0f32, 0.0f32, 4.0f32, 4.0f32));
+        |> Scene.addNode("parent", rectAreaNode(100.0, 0.0, 4.0, 4.0))
+        |> Scene.addChild("parent", "child", rectAreaNode(0.0, 0.0, 4.0, 4.0))
+        |> Scene.addNode("other", rectAreaNode(101.0, 0.0, 4.0, 4.0));
     let overlaps = AreaEvent.detectOverlaps(scene);
     Assert.assertTrue(List.length(overlaps) > 0)
 
@@ -184,8 +184,8 @@ def testRunWithNoopAreaEvent(): Unit \ Assert =
 @Test
 def testEmitOverlapEventsIntegration(): Unit \ Assert =
     let scene: Scene[Unit] = Scene.empty()
-        |> Scene.addNode("a", rectAreaNode(0.0f32, 0.0f32, 10.0f32, 10.0f32))
-        |> Scene.addNode("b", rectAreaNode(5.0f32, 0.0f32, 10.0f32, 10.0f32));
+        |> Scene.addNode("a", rectAreaNode(0.0, 0.0, 10.0, 10.0))
+        |> Scene.addNode("b", rectAreaNode(5.0, 0.0, 10.0, 10.0));
     let count = run {
         AreaEvent.emitOverlapEvents(scene);
         0
@@ -199,8 +199,8 @@ def testEmitOverlapEventsIntegration(): Unit \ Assert =
 @Test
 def testEmitOverlapEventsNoOverlap(): Unit \ Assert =
     let scene: Scene[Unit] = Scene.empty()
-        |> Scene.addNode("a", rectAreaNode(0.0f32, 0.0f32, 4.0f32, 4.0f32))
-        |> Scene.addNode("b", rectAreaNode(100.0f32, 0.0f32, 4.0f32, 4.0f32));
+        |> Scene.addNode("a", rectAreaNode(0.0, 0.0, 4.0, 4.0))
+        |> Scene.addNode("b", rectAreaNode(100.0, 0.0, 4.0, 4.0));
     let count = run {
         AreaEvent.emitOverlapEvents(scene);
         0
@@ -218,8 +218,8 @@ def testEmitOverlapEventsNoOverlap(): Unit \ Assert =
 @Test
 def testProcessAndEmitFiresEvents(): Unit \ Assert =
     let scene: Scene[Unit] = Scene.empty()
-        |> Scene.addNode("a", rectAreaNode(0.0f32, 0.0f32, 10.0f32, 10.0f32))
-        |> Scene.addNode("b", rectAreaNode(5.0f32, 0.0f32, 10.0f32, 10.0f32));
+        |> Scene.addNode("a", rectAreaNode(0.0, 0.0, 10.0, 10.0))
+        |> Scene.addNode("b", rectAreaNode(5.0, 0.0, 10.0, 10.0));
     let count = run {
         let _s = AreaEvent.processAndEmit(0.016, false, scene);
         0
@@ -233,8 +233,8 @@ def testProcessAndEmitFiresEvents(): Unit \ Assert =
 @Test
 def testProcessAndEmitNoEvents(): Unit \ Assert =
     let scene: Scene[Unit] = Scene.empty()
-        |> Scene.addNode("a", rectAreaNode(0.0f32, 0.0f32, 4.0f32, 4.0f32))
-        |> Scene.addNode("b", rectAreaNode(100.0f32, 0.0f32, 4.0f32, 4.0f32));
+        |> Scene.addNode("a", rectAreaNode(0.0, 0.0, 4.0, 4.0))
+        |> Scene.addNode("b", rectAreaNode(100.0, 0.0, 4.0, 4.0));
     let count = run {
         let _s = AreaEvent.processAndEmit(0.016, false, scene);
         0
@@ -248,8 +248,8 @@ def testProcessAndEmitNoEvents(): Unit \ Assert =
 @Test
 def testProcessAndEmitHandlerTransform(): Unit \ Assert =
     let scene: Scene[Unit] = Scene.empty()
-        |> Scene.addNode("player", rectAreaNode(0.0f32, 0.0f32, 10.0f32, 10.0f32))
-        |> Scene.addNode("enemy", rectAreaNode(5.0f32, 0.0f32, 10.0f32, 10.0f32));
+        |> Scene.addNode("player", rectAreaNode(0.0, 0.0, 10.0, 10.0))
+        |> Scene.addNode("enemy", rectAreaNode(5.0, 0.0, 10.0, 10.0));
     let hitPaths: List[NodePath] = run {
         let _s = AreaEvent.processAndEmit(0.016, false, scene);
         Nil
@@ -267,8 +267,8 @@ def testProcessAndEmitHandlerTransform(): Unit \ Assert =
 @Test
 def testProcessAndEmitHandledChangesModulate(): Unit \ Assert =
     let scene: Scene[TestAreaState] = Scene.empty()
-        |> Scene.addNode("red", testStateAreaNode(0.0f32, 0.0f32, 10.0f32, 10.0f32, TestAreaState.RedState))
-        |> Scene.addNode("blue", testStateAreaNode(5.0f32, 0.0f32, 10.0f32, 10.0f32, TestAreaState.BlueState));
+        |> Scene.addNode("red", testStateAreaNode(0.0, 0.0, 10.0, 10.0, TestAreaState.RedState))
+        |> Scene.addNode("blue", testStateAreaNode(5.0, 0.0, 10.0, 10.0, TestAreaState.BlueState));
     let result = AreaEvent.processAndEmitHandled(0.016, false, scene);
     match Scene.getEngineNode("red" :: Nil, result) {
         case Some(engineNode) =>
@@ -281,8 +281,8 @@ def testProcessAndEmitHandledChangesModulate(): Unit \ Assert =
 @Test
 def testProcessAndEmitHandledBlueUnchanged(): Unit \ Assert =
     let scene: Scene[TestAreaState] = Scene.empty()
-        |> Scene.addNode("red", testStateAreaNode(0.0f32, 0.0f32, 10.0f32, 10.0f32, TestAreaState.RedState))
-        |> Scene.addNode("blue", testStateAreaNode(5.0f32, 0.0f32, 10.0f32, 10.0f32, TestAreaState.BlueState));
+        |> Scene.addNode("red", testStateAreaNode(0.0, 0.0, 10.0, 10.0, TestAreaState.RedState))
+        |> Scene.addNode("blue", testStateAreaNode(5.0, 0.0, 10.0, 10.0, TestAreaState.BlueState));
     let result = AreaEvent.processAndEmitHandled(0.016, false, scene);
     match Scene.getEngineNode("blue" :: Nil, result) {
         case Some(engineNode) =>
@@ -295,8 +295,8 @@ def testProcessAndEmitHandledBlueUnchanged(): Unit \ Assert =
 @Test
 def testProcessAndEmitHandledNoOverlap(): Unit \ Assert =
     let scene: Scene[TestAreaState] = Scene.empty()
-        |> Scene.addNode("red", testStateAreaNode(0.0f32, 0.0f32, 4.0f32, 4.0f32, TestAreaState.RedState))
-        |> Scene.addNode("blue", testStateAreaNode(100.0f32, 0.0f32, 4.0f32, 4.0f32, TestAreaState.BlueState));
+        |> Scene.addNode("red", testStateAreaNode(0.0, 0.0, 4.0, 4.0, TestAreaState.RedState))
+        |> Scene.addNode("blue", testStateAreaNode(100.0, 0.0, 4.0, 4.0, TestAreaState.BlueState));
     let result = AreaEvent.processAndEmitHandled(0.016, false, scene);
     match Scene.getEngineNode("red" :: Nil, result) {
         case Some(engineNode) =>
@@ -309,8 +309,8 @@ def testProcessAndEmitHandledNoOverlap(): Unit \ Assert =
 @Test
 def testProcessAndEmitHandledSameVariant(): Unit \ Assert =
     let scene: Scene[TestAreaState] = Scene.empty()
-        |> Scene.addNode("r1", testStateAreaNode(0.0f32, 0.0f32, 10.0f32, 10.0f32, TestAreaState.RedState))
-        |> Scene.addNode("r2", testStateAreaNode(5.0f32, 0.0f32, 10.0f32, 10.0f32, TestAreaState.RedState));
+        |> Scene.addNode("r1", testStateAreaNode(0.0, 0.0, 10.0, 10.0, TestAreaState.RedState))
+        |> Scene.addNode("r2", testStateAreaNode(5.0, 0.0, 10.0, 10.0, TestAreaState.RedState));
     let result = AreaEvent.processAndEmitHandled(0.016, false, scene);
     match Scene.getEngineNode("r1" :: Nil, result) {
         case Some(engineNode) =>
@@ -331,13 +331,13 @@ def testProcessAndEmitHandledSameVariant(): Unit \ Assert =
 def testProcessAndEmitHandledFiresExitOnSeparation(): Unit \ Assert =
     // フレーム1: 重なりあり → prevOverlaps を取得
     let scene: Scene[TestAreaState] = Scene.empty()
-        |> Scene.addNode("red", testStateAreaNode(0.0f32, 0.0f32, 10.0f32, 10.0f32, TestAreaState.RedState))
-        |> Scene.addNode("blue", testStateAreaNode(5.0f32, 0.0f32, 10.0f32, 10.0f32, TestAreaState.BlueState));
+        |> Scene.addNode("red", testStateAreaNode(0.0, 0.0, 10.0, 10.0, TestAreaState.RedState))
+        |> Scene.addNode("blue", testStateAreaNode(5.0, 0.0, 10.0, 10.0, TestAreaState.BlueState));
     let sceneAfterEnter = AreaEvent.processAndEmitHandled(0.016, false, scene);
     // フレーム2: 離す → 前フレームの prevOverlaps は Scene 内に保持されている
     let separatedScene: Scene[TestAreaState] = Scene.empty()
-        |> Scene.addNode("red", testStateAreaNode(0.0f32, 0.0f32, 4.0f32, 4.0f32, TestAreaState.RedState))
-        |> Scene.addNode("blue", testStateAreaNode(100.0f32, 0.0f32, 4.0f32, 4.0f32, TestAreaState.BlueState))
+        |> Scene.addNode("red", testStateAreaNode(0.0, 0.0, 4.0, 4.0, TestAreaState.RedState))
+        |> Scene.addNode("blue", testStateAreaNode(100.0, 0.0, 4.0, 4.0, TestAreaState.BlueState))
         |> Scene.setPrevOverlaps(Scene.getPrevOverlaps(sceneAfterEnter));
     let result = AreaEvent.processAndEmitHandled(0.016, false, separatedScene);
     // 離脱後のペアセットは空
@@ -354,8 +354,8 @@ def testProcessAndEmitHandledFiresExitOnSeparation(): Unit \ Assert =
 @Test
 def testProcessAndEmitHandledNoExitWithEmptyPrev(): Unit \ Assert =
     let scene: Scene[TestAreaState] = Scene.empty()
-        |> Scene.addNode("red", testStateAreaNode(0.0f32, 0.0f32, 4.0f32, 4.0f32, TestAreaState.RedState))
-        |> Scene.addNode("blue", testStateAreaNode(100.0f32, 0.0f32, 4.0f32, 4.0f32, TestAreaState.BlueState));
+        |> Scene.addNode("red", testStateAreaNode(0.0, 0.0, 4.0, 4.0, TestAreaState.RedState))
+        |> Scene.addNode("blue", testStateAreaNode(100.0, 0.0, 4.0, 4.0, TestAreaState.BlueState));
     let result = AreaEvent.processAndEmitHandled(0.016, false, scene);
     Assert.assertEq(expected = 0, Set.size(Scene.getPrevOverlaps(result)));
     match Scene.getEngineNode("red" :: Nil, result) {

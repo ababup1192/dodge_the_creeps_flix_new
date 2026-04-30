@@ -1,7 +1,7 @@
 mod TestTextLayout {
 
-    def approx(a: Float32, b: Float32): Bool =
-        Float32.abs(a - b) < 0.001f32
+    def approx(a: Float64, b: Float64): Bool =
+        Float64.abs(a - b) < 0.001
 
     // ========================================================================
     // charToCodePoint
@@ -33,15 +33,15 @@ mod TestTextLayout {
 
     @Test
     def testCenterOffsetZero(): Unit \ Assert =
-        Assert.assertTrue(approx(TextLayout.centerOffset(0.0f32, 1.0f32), 0.0f32))
+        Assert.assertTrue(approx(TextLayout.centerOffset(0.0, 1.0), 0.0))
 
     @Test
     def testCenterOffset(): Unit \ Assert =
-        Assert.assertTrue(approx(TextLayout.centerOffset(100.0f32, 1.0f32), -50.0f32))
+        Assert.assertTrue(approx(TextLayout.centerOffset(100.0, 1.0), -50.0))
 
     @Test
     def testCenterOffsetWithScale(): Unit \ Assert =
-        Assert.assertTrue(approx(TextLayout.centerOffset(100.0f32, 0.5f32), -25.0f32))
+        Assert.assertTrue(approx(TextLayout.centerOffset(100.0, 0.5), -25.0))
 
     // ========================================================================
     // totalAdvance
@@ -49,12 +49,12 @@ mod TestTextLayout {
 
     @Test
     def testTotalAdvanceEmpty(): Unit \ Assert =
-        Assert.assertTrue(approx(TextLayout.totalAdvance(Nil), 0.0f32))
+        Assert.assertTrue(approx(TextLayout.totalAdvance(Nil), 0.0))
 
     @Test
     def testTotalAdvance(): Unit \ Assert =
-        let advances = 10.0f32 :: 20.0f32 :: 30.0f32 :: Nil;
-        Assert.assertTrue(approx(TextLayout.totalAdvance(advances), 60.0f32))
+        let advances = 10.0 :: 20.0 :: 30.0 :: Nil;
+        Assert.assertTrue(approx(TextLayout.totalAdvance(advances), 60.0))
 
     // ========================================================================
     // layoutPositions — no wrap
@@ -62,37 +62,37 @@ mod TestTextLayout {
 
     @Test
     def testLayoutNoWrapEmpty(): Unit \ Assert =
-        let result = TextLayout.layoutPositions(Nil, 0.0f32, 1.0f32, 10.0f32);
+        let result = TextLayout.layoutPositions(Nil, 0.0, 1.0, 10.0);
         Assert.assertTrue(List.length(result) == 0)
 
     @Test
     def testLayoutNoWrapSingleChar(): Unit \ Assert =
-        let result = TextLayout.layoutPositions(10.0f32 :: Nil, 0.0f32, 1.0f32, 10.0f32);
+        let result = TextLayout.layoutPositions(10.0 :: Nil, 0.0, 1.0, 10.0);
         region rc {
             let r = List.toArray(rc, result);
             let (x, y) = Array.get(0, r);
-            Assert.assertTrue(approx(x, 0.0f32) and approx(y, 0.0f32))
+            Assert.assertTrue(approx(x, 0.0) and approx(y, 0.0))
         }
 
     @Test
     def testLayoutNoWrapPenAdvances(): Unit \ Assert =
-        let advances = 10.0f32 :: 20.0f32 :: 15.0f32 :: Nil;
-        let result = TextLayout.layoutPositions(advances, 0.0f32, 1.0f32, 10.0f32);
+        let advances = 10.0 :: 20.0 :: 15.0 :: Nil;
+        let result = TextLayout.layoutPositions(advances, 0.0, 1.0, 10.0);
         region rc {
             let r = List.toArray(rc, result);
             let (x0, _) = Array.get(0, r);
             let (x1, _) = Array.get(1, r);
             let (x2, _) = Array.get(2, r);
-            Assert.assertTrue(approx(x0, 0.0f32));
-            Assert.assertTrue(approx(x1, 10.0f32));
-            Assert.assertTrue(approx(x2, 30.0f32))
+            Assert.assertTrue(approx(x0, 0.0));
+            Assert.assertTrue(approx(x1, 10.0));
+            Assert.assertTrue(approx(x2, 30.0))
         }
 
     @Test
     def testLayoutNoWrapAllOnLine0(): Unit \ Assert =
-        let advances = 10.0f32 :: 10.0f32 :: 10.0f32 :: Nil;
-        let result = TextLayout.layoutPositions(advances, 0.0f32, 1.0f32, 10.0f32);
-        Assert.assertTrue(List.forAll(match (_, y) -> approx(y, 0.0f32), result))
+        let advances = 10.0 :: 10.0 :: 10.0 :: Nil;
+        let result = TextLayout.layoutPositions(advances, 0.0, 1.0, 10.0);
+        Assert.assertTrue(List.forAll(match (_, y) -> approx(y, 0.0), result))
 
     // ========================================================================
     // layoutPositions — with wrap
@@ -100,22 +100,22 @@ mod TestTextLayout {
 
     @Test
     def testLayoutWrapNoBreakNeeded(): Unit \ Assert =
-        let advances = 10.0f32 :: 10.0f32 :: 10.0f32 :: Nil;
-        let result = TextLayout.layoutPositions(advances, 100.0f32, 1.0f32, 20.0f32);
-        Assert.assertTrue(List.forAll(match (_, y) -> approx(y, 0.0f32), result))
+        let advances = 10.0 :: 10.0 :: 10.0 :: Nil;
+        let result = TextLayout.layoutPositions(advances, 100.0, 1.0, 20.0);
+        Assert.assertTrue(List.forAll(match (_, y) -> approx(y, 0.0), result))
 
     @Test
     def testLayoutWrapBreaksAtWidth(): Unit \ Assert =
-        let advances = 10.0f32 :: 10.0f32 :: 10.0f32 :: Nil;
-        let result = TextLayout.layoutPositions(advances, 25.0f32, 1.0f32, 20.0f32);
+        let advances = 10.0 :: 10.0 :: 10.0 :: Nil;
+        let result = TextLayout.layoutPositions(advances, 25.0, 1.0, 20.0);
         region rc {
             let r = List.toArray(rc, result);
             let (x0, y0) = Array.get(0, r);
             let (x1, y1) = Array.get(1, r);
             let (x2, y2) = Array.get(2, r);
-            Assert.assertTrue(approx(x0, 0.0f32) and approx(y0, 0.0f32));
-            Assert.assertTrue(approx(x1, 10.0f32) and approx(y1, 0.0f32));
-            Assert.assertTrue(approx(x2, 0.0f32) and approx(y2, 20.0f32))
+            Assert.assertTrue(approx(x0, 0.0) and approx(y0, 0.0));
+            Assert.assertTrue(approx(x1, 10.0) and approx(y1, 0.0));
+            Assert.assertTrue(approx(x2, 0.0) and approx(y2, 20.0))
         }
 
     @Test
@@ -124,22 +124,22 @@ mod TestTextLayout {
         // char 0: penX=0, next=10, 10*2=20<35 => stays. penX=10
         // char 1: penX=10, next=20, 20*2=40>35 => wraps to y=20. penX=10
         // char 2: penX=10, next=20, 20*2=40>35 => wraps to y=40. penX=10
-        let advances = 10.0f32 :: 10.0f32 :: 10.0f32 :: Nil;
-        let result = TextLayout.layoutPositions(advances, 35.0f32, 2.0f32, 20.0f32);
+        let advances = 10.0 :: 10.0 :: 10.0 :: Nil;
+        let result = TextLayout.layoutPositions(advances, 35.0, 2.0, 20.0);
         region rc {
             let r = List.toArray(rc, result);
             let (x0, y0) = Array.get(0, r);
             let (x1, y1) = Array.get(1, r);
             let (x2, y2) = Array.get(2, r);
-            Assert.assertTrue(approx(x0, 0.0f32) and approx(y0, 0.0f32));
-            Assert.assertTrue(approx(x1, 0.0f32) and approx(y1, 20.0f32));
-            Assert.assertTrue(approx(x2, 0.0f32) and approx(y2, 40.0f32))
+            Assert.assertTrue(approx(x0, 0.0) and approx(y0, 0.0));
+            Assert.assertTrue(approx(x1, 0.0) and approx(y1, 20.0));
+            Assert.assertTrue(approx(x2, 0.0) and approx(y2, 40.0))
         }
 
     @Test
     def testLayoutWrapMultipleLines(): Unit \ Assert =
-        let advances = 10.0f32 :: 10.0f32 :: 10.0f32 :: 10.0f32 :: 10.0f32 :: Nil;
-        let result = TextLayout.layoutPositions(advances, 25.0f32, 1.0f32, 20.0f32);
+        let advances = 10.0 :: 10.0 :: 10.0 :: 10.0 :: 10.0 :: Nil;
+        let result = TextLayout.layoutPositions(advances, 25.0, 1.0, 20.0);
         region rc {
             let r = List.toArray(rc, result);
             let (_, y0) = Array.get(0, r);
@@ -147,19 +147,19 @@ mod TestTextLayout {
             let (_, y2) = Array.get(2, r);
             let (_, y3) = Array.get(3, r);
             let (_, y4) = Array.get(4, r);
-            Assert.assertTrue(approx(y0, 0.0f32) and approx(y1, 0.0f32));
-            Assert.assertTrue(approx(y2, 20.0f32) and approx(y3, 20.0f32));
-            Assert.assertTrue(approx(y4, 40.0f32))
+            Assert.assertTrue(approx(y0, 0.0) and approx(y1, 0.0));
+            Assert.assertTrue(approx(y2, 20.0) and approx(y3, 20.0));
+            Assert.assertTrue(approx(y4, 40.0))
         }
 
     @Test
     def testLayoutWrapFirstCharNeverWraps(): Unit \ Assert =
-        let advances = 100.0f32 :: Nil;
-        let result = TextLayout.layoutPositions(advances, 50.0f32, 1.0f32, 20.0f32);
+        let advances = 100.0 :: Nil;
+        let result = TextLayout.layoutPositions(advances, 50.0, 1.0, 20.0);
         region rc {
             let r = List.toArray(rc, result);
             let (_, y) = Array.get(0, r);
-            Assert.assertTrue(approx(y, 0.0f32))
+            Assert.assertTrue(approx(y, 0.0))
         }
 
     // ========================================================================
@@ -168,22 +168,22 @@ mod TestTextLayout {
 
     @Test
     def testLineCountEmpty(): Unit \ Assert =
-        Assert.assertTrue(TextLayout.lineCount(Nil, 100.0f32, 1.0f32, 20.0f32) == 0)
+        Assert.assertTrue(TextLayout.lineCount(Nil, 100.0, 1.0, 20.0) == 0)
 
     @Test
     def testLineCountSingleLine(): Unit \ Assert =
-        let advances = 10.0f32 :: 10.0f32 :: 10.0f32 :: Nil;
-        Assert.assertTrue(TextLayout.lineCount(advances, 100.0f32, 1.0f32, 20.0f32) == 1)
+        let advances = 10.0 :: 10.0 :: 10.0 :: Nil;
+        Assert.assertTrue(TextLayout.lineCount(advances, 100.0, 1.0, 20.0) == 1)
 
     @Test
     def testLineCountTwoLines(): Unit \ Assert =
-        let advances = 10.0f32 :: 10.0f32 :: 10.0f32 :: Nil;
-        Assert.assertTrue(TextLayout.lineCount(advances, 25.0f32, 1.0f32, 20.0f32) == 2)
+        let advances = 10.0 :: 10.0 :: 10.0 :: Nil;
+        Assert.assertTrue(TextLayout.lineCount(advances, 25.0, 1.0, 20.0) == 2)
 
     @Test
     def testLineCountThreeLines(): Unit \ Assert =
-        let advances = 10.0f32 :: 10.0f32 :: 10.0f32 :: 10.0f32 :: 10.0f32 :: Nil;
-        Assert.assertTrue(TextLayout.lineCount(advances, 25.0f32, 1.0f32, 20.0f32) == 3)
+        let advances = 10.0 :: 10.0 :: 10.0 :: 10.0 :: 10.0 :: Nil;
+        Assert.assertTrue(TextLayout.lineCount(advances, 25.0, 1.0, 20.0) == 3)
 
     // ========================================================================
     // glyphQuadBounds
@@ -191,38 +191,38 @@ mod TestTextLayout {
 
     @Test
     def testGlyphQuadBoundsBasic(): Unit \ Assert =
-        let gm: TextLayout.GlyphMetrics = {xOff = 2.0f32, yOff = -10.0f32, glyphW = 8.0f32, glyphH = 12.0f32, advance = 10.0f32, s0 = 0.0f32, t0 = 0.0f32, s1 = 0.0f32, t1 = 0.0f32};
-        let q = TextLayout.glyphQuadBounds((0.0f32, 0.0f32), gm, 1.0f32, {x = 100.0f32, y = 200.0f32}, 0.0f32);
-        Assert.assertTrue(approx(q#x0, 102.0f32));
-        Assert.assertTrue(approx(q#y0, 190.0f32));
-        Assert.assertTrue(approx(q#x1, 110.0f32));
-        Assert.assertTrue(approx(q#y1, 202.0f32))
+        let gm: TextLayout.GlyphMetrics = {xOff = 2.0, yOff = -10.0, glyphW = 8.0, glyphH = 12.0, advance = 10.0, s0 = 0.0, t0 = 0.0, s1 = 0.0, t1 = 0.0};
+        let q = TextLayout.glyphQuadBounds((0.0, 0.0), gm, 1.0, {x = 100.0, y = 200.0}, 0.0);
+        Assert.assertTrue(approx(q#x0, 102.0));
+        Assert.assertTrue(approx(q#y0, 190.0));
+        Assert.assertTrue(approx(q#x1, 110.0));
+        Assert.assertTrue(approx(q#y1, 202.0))
 
     @Test
     def testGlyphQuadBoundsWithScale(): Unit \ Assert =
-        let gm: TextLayout.GlyphMetrics = {xOff = 0.0f32, yOff = 0.0f32, glyphW = 10.0f32, glyphH = 20.0f32, advance = 12.0f32, s0 = 0.0f32, t0 = 0.0f32, s1 = 0.0f32, t1 = 0.0f32};
-        let q = TextLayout.glyphQuadBounds((5.0f32, 0.0f32), gm, 0.5f32, {x = 0.0f32, y = 0.0f32}, 0.0f32);
+        let gm: TextLayout.GlyphMetrics = {xOff = 0.0, yOff = 0.0, glyphW = 10.0, glyphH = 20.0, advance = 12.0, s0 = 0.0, t0 = 0.0, s1 = 0.0, t1 = 0.0};
+        let q = TextLayout.glyphQuadBounds((5.0, 0.0), gm, 0.5, {x = 0.0, y = 0.0}, 0.0);
         // x0 = (5+0)*0.5 = 2.5, y0 = 0, x1 = 2.5+10*0.5 = 7.5, y1 = 0+20*0.5 = 10
-        Assert.assertTrue(approx(q#x0, 2.5f32));
-        Assert.assertTrue(approx(q#y0, 0.0f32));
-        Assert.assertTrue(approx(q#x1, 7.5f32));
-        Assert.assertTrue(approx(q#y1, 10.0f32))
+        Assert.assertTrue(approx(q#x0, 2.5));
+        Assert.assertTrue(approx(q#y0, 0.0));
+        Assert.assertTrue(approx(q#x1, 7.5));
+        Assert.assertTrue(approx(q#y1, 10.0))
 
     @Test
     def testGlyphQuadBoundsWithCenterOffset(): Unit \ Assert =
-        let gm: TextLayout.GlyphMetrics = {xOff = 0.0f32, yOff = 0.0f32, glyphW = 10.0f32, glyphH = 10.0f32, advance = 10.0f32, s0 = 0.0f32, t0 = 0.0f32, s1 = 0.0f32, t1 = 0.0f32};
-        let q = TextLayout.glyphQuadBounds((0.0f32, 0.0f32), gm, 1.0f32, {x = 100.0f32, y = 50.0f32}, -20.0f32);
-        Assert.assertTrue(approx(q#x0, 80.0f32));
-        Assert.assertTrue(approx(q#y0, 50.0f32))
+        let gm: TextLayout.GlyphMetrics = {xOff = 0.0, yOff = 0.0, glyphW = 10.0, glyphH = 10.0, advance = 10.0, s0 = 0.0, t0 = 0.0, s1 = 0.0, t1 = 0.0};
+        let q = TextLayout.glyphQuadBounds((0.0, 0.0), gm, 1.0, {x = 100.0, y = 50.0}, -20.0);
+        Assert.assertTrue(approx(q#x0, 80.0));
+        Assert.assertTrue(approx(q#y0, 50.0))
 
     @Test
     def testGlyphQuadBoundsWrappedLine(): Unit \ Assert =
-        let gm: TextLayout.GlyphMetrics = {xOff = 1.0f32, yOff = -8.0f32, glyphW = 10.0f32, glyphH = 10.0f32, advance = 12.0f32, s0 = 0.0f32, t0 = 0.0f32, s1 = 0.0f32, t1 = 0.0f32};
+        let gm: TextLayout.GlyphMetrics = {xOff = 1.0, yOff = -8.0, glyphW = 10.0, glyphH = 10.0, advance = 12.0, s0 = 0.0, t0 = 0.0, s1 = 0.0, t1 = 0.0};
         // penPos on second line
-        let q = TextLayout.glyphQuadBounds((0.0f32, 20.0f32), gm, 2.0f32, {x = 10.0f32, y = 10.0f32}, 0.0f32);
+        let q = TextLayout.glyphQuadBounds((0.0, 20.0), gm, 2.0, {x = 10.0, y = 10.0}, 0.0);
         // x0 = (0+1)*2 + 10 = 12, y0 = (20-8)*2 + 10 = 34
-        Assert.assertTrue(approx(q#x0, 12.0f32));
-        Assert.assertTrue(approx(q#y0, 34.0f32));
-        Assert.assertTrue(approx(q#x1, 32.0f32));
-        Assert.assertTrue(approx(q#y1, 54.0f32))
+        Assert.assertTrue(approx(q#x0, 12.0));
+        Assert.assertTrue(approx(q#y0, 34.0));
+        Assert.assertTrue(approx(q#x1, 32.0));
+        Assert.assertTrue(approx(q#y1, 54.0))
 }

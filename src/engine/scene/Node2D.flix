@@ -89,7 +89,7 @@ pub trait Node2D[a] with CanvasItem[a] {
     ///
     pub def getAngleTo(point: Vec2.Vec2, node: a): Float64 =
         let position = Node2D.getPosition(node);
-        Float32.toFloat64(Vec2.sub(point, position) |> Vec2.angle)
+        Vec2.sub(point, position) |> Vec2.angle
 
     /// 指定した点の方を向くように回転する
     ///
