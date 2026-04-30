@@ -39,9 +39,9 @@ def testScene(): Scene[GameData] = Game.buildState(testFontAtlas())#scene
 /// テスト用ヘルパー: buildState を取得
 def testState(): GameState = Game.buildState(testFontAtlas())
 
-/// テスト用ヘルパー: readyAll 済みのシーンを取得（screenSize が設定される）
+/// テスト用ヘルパー: processAll 済みのシーンを取得（screenSize が設定される）
 def testReadyScene(): Scene[GameData] =
-    withMockEngine(() -> Scene.readyAll(testScene()))
+    withMockEngine(() -> Scene.processAll(0.0, false, testScene()))
 
 /// Vec2 をタプルに変換するヘルパー
 def vecToTuple(v: Vec2.Vec2): (Float64, Float64) = (v#x, v#y)
@@ -343,7 +343,7 @@ def testSwitchAnimResetsFrame(): Unit \ Assert =
 /// readyAll 後に screenSize がモックのビューポートサイズ (480x720) に設定される
 @Test
 def testReadySetsScreenSize(): Unit \ Assert =
-    let scene = withMockEngine(() -> Scene.readyAll(testScene()));
+    let scene = withMockEngine(() -> Scene.processAll(0.0, false, testScene()));
     match Scene.get("player", scene) {
         case Some(GameData.Player(_, pd)) =>
             Assert.assertEq(expected = (480.0, 720.0), vecToTuple(pd#screenSize))
@@ -354,12 +354,12 @@ def testReadySetsScreenSize(): Unit \ Assert =
 // ready → hide / start → show ライフサイクル
 // ========================================================================
 
-/// readyAll 後にプレイヤーが非表示であること
+/// ready 後もプレイヤーが表示状態であること（hide はスタート画面実装時に復活）
 @Test
-def testReadyHidesPlayer(): Unit \ Assert =
+def testReadyKeepsPlayerVisible(): Unit \ Assert =
     let scene = testReadyScene();
     match Scene.getEngineNode("player" :: Nil, scene) {
-        case Some(engineNode) => Assert.assertFalse(CanvasItem.isVisible(engineNode))
+        case Some(engineNode) => Assert.assertTrue(CanvasItem.isVisible(engineNode))
         case None => bug!("player not found")
     }
 

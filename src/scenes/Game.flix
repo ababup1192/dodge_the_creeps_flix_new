@@ -6,6 +6,7 @@ pub enum GameData {
     case PlayerArea
     case MobData
     case MobSprite
+    case MobNotifier
 }
 
 pub type alias GameState = {
@@ -46,6 +47,17 @@ instance AreaHandler[GameData] {
     pub def onAreaEntered(_selfPath: NodePath, _selfState: GameData,
                           _otherPath: NodePath, _otherState: GameData,
                           scene: Scene[GameData]): Scene[GameData] = scene
+}
+
+// ── ScreenNotifyHandler 実装 ──
+
+instance ScreenNotifyHandler[GameData] {
+    redef onScreenExited(path: NodePath, state: GameData,
+                         scene: Scene[GameData]): Scene[GameData] =
+        match state {
+            case GameData.MobData => Scene.removeAt(path, scene)
+            case _ => scene
+        }
 }
 
 mod Game {
@@ -91,12 +103,9 @@ mod Game {
 
     pub def start(fontAtlas: FontAtlas): Unit \ Engine.Game =
         let state = buildState(fontAtlas);
-        let readyState: GameState = {
-            scene = Scene.readyAll(state#scene)
-            | state };
         let startedState: GameState = {
-            scene = PlayerScene.start({x = 240.0, y = 360.0}, readyState#scene)
-            | readyState };
+            scene = PlayerScene.start({x = 240.0, y = 360.0}, state#scene)
+            | state };
         gameLoop(fontAtlas, startedState)
 
     def gameLoop(fontAtlas: FontAtlas, state: GameState): Unit \ Engine.Game =
@@ -106,10 +115,12 @@ mod Game {
             let dt = Engine.Game.getDeltaTime();
             let dir = readInputDirection();
             let gravity = PhysicsStep.defaultGravity();
+            let screenW = Int32.toFloat64(screenWi());
+            let screenH = Int32.toFloat64(screenHi());
             { scene = state#scene
                 |> PlayerScene.applyInput(dir)
-                |> GameEngine.updateWithPhysicsAndAreaHandler(dt, false, gravity)
-                |> MobScene.removeOffScreenMobs
+                |> GameEngine.updateFull(dt, false, gravity,
+                    screenWidth = screenW, screenHeight = screenH)
               | state }
                 |> MobScene.maybeSpawnMob(dt)
                 |> gameLoop(fontAtlas)

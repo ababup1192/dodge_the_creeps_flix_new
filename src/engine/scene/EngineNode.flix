@@ -18,6 +18,8 @@ pub enum EngineNode[state] {
     case Label2DWithState(Label2D, state)
     /// 位置マーカー（スポーン地点・参照点）
     case Marker2DWithState(Marker2D, state)
+    /// 画面外通知ノード（VisibleOnScreenNotifier2D ベースの画面外検出）
+    case ScreenNotifier2DWithState(VisibleOnScreenNotifier2D, state)
 }
 
 mod EngineNode {
@@ -31,6 +33,7 @@ mod EngineNode {
         case EngineNode.AnimSprite2DWithState(_, state) => state
         case EngineNode.Label2DWithState(_, state) => state
         case EngineNode.Marker2DWithState(_, state) => state
+        case EngineNode.ScreenNotifier2DWithState(_, state) => state
     }
 
     /// EngineNode の state を置き換える
@@ -42,6 +45,7 @@ mod EngineNode {
         case EngineNode.AnimSprite2DWithState(inner, _) => EngineNode.AnimSprite2DWithState(inner, newState)
         case EngineNode.Label2DWithState(inner, _) => EngineNode.Label2DWithState(inner, newState)
         case EngineNode.Marker2DWithState(inner, _) => EngineNode.Marker2DWithState(inner, newState)
+        case EngineNode.ScreenNotifier2DWithState(inner, _) => EngineNode.ScreenNotifier2DWithState(inner, newState)
     }
 
     /// EngineNode の state に関数を適用する
@@ -53,6 +57,7 @@ mod EngineNode {
         case EngineNode.AnimSprite2DWithState(inner, state) => EngineNode.AnimSprite2DWithState(inner, f(state))
         case EngineNode.Label2DWithState(inner, state) => EngineNode.Label2DWithState(inner, f(state))
         case EngineNode.Marker2DWithState(inner, state) => EngineNode.Marker2DWithState(inner, f(state))
+        case EngineNode.ScreenNotifier2DWithState(inner, state) => EngineNode.ScreenNotifier2DWithState(inner, f(state))
     }
 
     /// Sprite2D の inner node に関数を適用する（他バリアントは変更なし）
@@ -159,6 +164,7 @@ instance CanvasItem[EngineNode[s]] {
         case EngineNode.AnimSprite2DWithState(sprite, _) => CanvasItem.isVisible(sprite)
         case EngineNode.Label2DWithState(label, _) => CanvasItem.isVisible(label)
         case EngineNode.Marker2DWithState(marker, _) => CanvasItem.isVisible(marker)
+        case EngineNode.ScreenNotifier2DWithState(_, _) => true
     }
     pub def setVisible(visible: Bool, node: EngineNode[s]): EngineNode[s] = match node {
         case EngineNode.Sprite2DWithState(sprite, st) => EngineNode.Sprite2DWithState(CanvasItem.setVisible(visible, sprite), st)
@@ -168,6 +174,7 @@ instance CanvasItem[EngineNode[s]] {
         case EngineNode.AnimSprite2DWithState(sprite, st) => EngineNode.AnimSprite2DWithState(CanvasItem.setVisible(visible, sprite), st)
         case EngineNode.Label2DWithState(label, st) => EngineNode.Label2DWithState(CanvasItem.setVisible(visible, label), st)
         case EngineNode.Marker2DWithState(marker, st) => EngineNode.Marker2DWithState(CanvasItem.setVisible(visible, marker), st)
+        case EngineNode.ScreenNotifier2DWithState(_, _) => node
     }
     pub def getModulate(node: EngineNode[s]): Color = match node {
         case EngineNode.Sprite2DWithState(sprite, _) => CanvasItem.getModulate(sprite)
@@ -177,6 +184,7 @@ instance CanvasItem[EngineNode[s]] {
         case EngineNode.AnimSprite2DWithState(sprite, _) => CanvasItem.getModulate(sprite)
         case EngineNode.Label2DWithState(label, _) => CanvasItem.getModulate(label)
         case EngineNode.Marker2DWithState(marker, _) => CanvasItem.getModulate(marker)
+        case EngineNode.ScreenNotifier2DWithState(_, _) => {r = 1.0f32, g = 1.0f32, b = 1.0f32}
     }
     pub def setModulate(color: Color, node: EngineNode[s]): EngineNode[s] = match node {
         case EngineNode.Sprite2DWithState(sprite, st) => EngineNode.Sprite2DWithState(CanvasItem.setModulate(color, sprite), st)
@@ -186,6 +194,7 @@ instance CanvasItem[EngineNode[s]] {
         case EngineNode.AnimSprite2DWithState(sprite, st) => EngineNode.AnimSprite2DWithState(CanvasItem.setModulate(color, sprite), st)
         case EngineNode.Label2DWithState(label, st) => EngineNode.Label2DWithState(CanvasItem.setModulate(color, label), st)
         case EngineNode.Marker2DWithState(marker, st) => EngineNode.Marker2DWithState(CanvasItem.setModulate(color, marker), st)
+        case EngineNode.ScreenNotifier2DWithState(_, _) => node
     }
     pub def getZIndex(node: EngineNode[s]): Int32 = match node {
         case EngineNode.Sprite2DWithState(sprite, _) => CanvasItem.getZIndex(sprite)
@@ -195,6 +204,7 @@ instance CanvasItem[EngineNode[s]] {
         case EngineNode.AnimSprite2DWithState(sprite, _) => CanvasItem.getZIndex(sprite)
         case EngineNode.Label2DWithState(label, _) => CanvasItem.getZIndex(label)
         case EngineNode.Marker2DWithState(marker, _) => CanvasItem.getZIndex(marker)
+        case EngineNode.ScreenNotifier2DWithState(_, _) => 0
     }
     pub def setZIndex(zIndex: Int32, node: EngineNode[s]): EngineNode[s] = match node {
         case EngineNode.Sprite2DWithState(sprite, st) => EngineNode.Sprite2DWithState(CanvasItem.setZIndex(zIndex, sprite), st)
@@ -204,6 +214,7 @@ instance CanvasItem[EngineNode[s]] {
         case EngineNode.AnimSprite2DWithState(sprite, st) => EngineNode.AnimSprite2DWithState(CanvasItem.setZIndex(zIndex, sprite), st)
         case EngineNode.Label2DWithState(label, st) => EngineNode.Label2DWithState(CanvasItem.setZIndex(zIndex, label), st)
         case EngineNode.Marker2DWithState(marker, st) => EngineNode.Marker2DWithState(CanvasItem.setZIndex(zIndex, marker), st)
+        case EngineNode.ScreenNotifier2DWithState(_, _) => node
     }
 }
 
@@ -218,6 +229,7 @@ instance Node2D[EngineNode[s]] {
         case EngineNode.AnimSprite2DWithState(sprite, _) => Node2D.getPosition(sprite)
         case EngineNode.Label2DWithState(label, _) => Node2D.getPosition(label)
         case EngineNode.Marker2DWithState(marker, _) => Node2D.getPosition(marker)
+        case EngineNode.ScreenNotifier2DWithState(_, _) => Vec2.zero()
     }
     pub def setPosition(position: Vec2.Vec2, node: EngineNode[s]): EngineNode[s] = match node {
         case EngineNode.Sprite2DWithState(sprite, st) => EngineNode.Sprite2DWithState(Node2D.setPosition(position, sprite), st)
@@ -227,6 +239,7 @@ instance Node2D[EngineNode[s]] {
         case EngineNode.AnimSprite2DWithState(sprite, st) => EngineNode.AnimSprite2DWithState(Node2D.setPosition(position, sprite), st)
         case EngineNode.Label2DWithState(label, st) => EngineNode.Label2DWithState(Node2D.setPosition(position, label), st)
         case EngineNode.Marker2DWithState(marker, st) => EngineNode.Marker2DWithState(Node2D.setPosition(position, marker), st)
+        case EngineNode.ScreenNotifier2DWithState(_, _) => node
     }
     pub def getRotation(node: EngineNode[s]): Float64 = match node {
         case EngineNode.Sprite2DWithState(sprite, _) => Node2D.getRotation(sprite)
@@ -236,6 +249,7 @@ instance Node2D[EngineNode[s]] {
         case EngineNode.AnimSprite2DWithState(sprite, _) => Node2D.getRotation(sprite)
         case EngineNode.Label2DWithState(label, _) => Node2D.getRotation(label)
         case EngineNode.Marker2DWithState(marker, _) => Node2D.getRotation(marker)
+        case EngineNode.ScreenNotifier2DWithState(_, _) => 0.0
     }
     pub def setRotation(rotation: Float64, node: EngineNode[s]): EngineNode[s] = match node {
         case EngineNode.Sprite2DWithState(sprite, st) => EngineNode.Sprite2DWithState(Node2D.setRotation(rotation, sprite), st)
@@ -245,6 +259,7 @@ instance Node2D[EngineNode[s]] {
         case EngineNode.AnimSprite2DWithState(sprite, st) => EngineNode.AnimSprite2DWithState(Node2D.setRotation(rotation, sprite), st)
         case EngineNode.Label2DWithState(label, st) => EngineNode.Label2DWithState(Node2D.setRotation(rotation, label), st)
         case EngineNode.Marker2DWithState(marker, st) => EngineNode.Marker2DWithState(Node2D.setRotation(rotation, marker), st)
+        case EngineNode.ScreenNotifier2DWithState(_, _) => node
     }
     pub def getScale(node: EngineNode[s]): Vec2.Vec2 = match node {
         case EngineNode.Sprite2DWithState(sprite, _) => Node2D.getScale(sprite)
@@ -254,6 +269,7 @@ instance Node2D[EngineNode[s]] {
         case EngineNode.AnimSprite2DWithState(sprite, _) => Node2D.getScale(sprite)
         case EngineNode.Label2DWithState(label, _) => Node2D.getScale(label)
         case EngineNode.Marker2DWithState(marker, _) => Node2D.getScale(marker)
+        case EngineNode.ScreenNotifier2DWithState(_, _) => {x = 1.0, y = 1.0}
     }
     pub def setScale(scale: Vec2.Vec2, node: EngineNode[s]): EngineNode[s] = match node {
         case EngineNode.Sprite2DWithState(sprite, st) => EngineNode.Sprite2DWithState(Node2D.setScale(scale, sprite), st)
@@ -263,6 +279,7 @@ instance Node2D[EngineNode[s]] {
         case EngineNode.AnimSprite2DWithState(sprite, st) => EngineNode.AnimSprite2DWithState(Node2D.setScale(scale, sprite), st)
         case EngineNode.Label2DWithState(label, st) => EngineNode.Label2DWithState(Node2D.setScale(scale, label), st)
         case EngineNode.Marker2DWithState(marker, st) => EngineNode.Marker2DWithState(Node2D.setScale(scale, marker), st)
+        case EngineNode.ScreenNotifier2DWithState(_, _) => node
     }
     pub def getSkew(node: EngineNode[s]): Float64 = match node {
         case EngineNode.Sprite2DWithState(sprite, _) => Node2D.getSkew(sprite)
@@ -272,6 +289,7 @@ instance Node2D[EngineNode[s]] {
         case EngineNode.AnimSprite2DWithState(sprite, _) => Node2D.getSkew(sprite)
         case EngineNode.Label2DWithState(label, _) => Node2D.getSkew(label)
         case EngineNode.Marker2DWithState(marker, _) => Node2D.getSkew(marker)
+        case EngineNode.ScreenNotifier2DWithState(_, _) => 0.0
     }
     pub def setSkew(skew: Float64, node: EngineNode[s]): EngineNode[s] = match node {
         case EngineNode.Sprite2DWithState(sprite, st) => EngineNode.Sprite2DWithState(Node2D.setSkew(skew, sprite), st)
@@ -281,6 +299,7 @@ instance Node2D[EngineNode[s]] {
         case EngineNode.AnimSprite2DWithState(sprite, st) => EngineNode.AnimSprite2DWithState(Node2D.setSkew(skew, sprite), st)
         case EngineNode.Label2DWithState(label, st) => EngineNode.Label2DWithState(Node2D.setSkew(skew, label), st)
         case EngineNode.Marker2DWithState(marker, st) => EngineNode.Marker2DWithState(Node2D.setSkew(skew, marker), st)
+        case EngineNode.ScreenNotifier2DWithState(_, _) => node
     }
 }
 
@@ -324,6 +343,7 @@ instance Engine.Renderable[EngineNode[s]] {
                 EngineNode.animSpriteToDrawable(sprite, globalPos) :: Nil
             case EngineNode.Label2DWithState(label, _) =>
                 Label2D.toDrawables(label, globalPos)
+            case EngineNode.ScreenNotifier2DWithState(_, _) => Nil
             case _ =>
                 EngineNode.fallbackDrawable(node, globalPos) :: Nil
         }

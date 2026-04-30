@@ -14,6 +14,7 @@ pub enum Scene[s] {
     case Scene({
         nodes = Map[NodeName, SceneEntry[s]],
         prevOverlaps = OverlapPairSet,
+        prevOnScreen = Set[NodePath],
         readied = Bool
     })
 }
@@ -38,6 +39,16 @@ pub mod Scene {
     pub def setPrevOverlaps(overlaps: OverlapPairSet, scene: Scene[s]): Scene[s] =
         let Scene.Scene(r) = scene;
         Scene.Scene({ prevOverlaps = overlaps | r })
+
+    /// 前フレームで画面内だったノードパスのセットを取り出す
+    pub def getPrevOnScreen(scene: Scene[s]): Set[NodePath] =
+        let Scene.Scene(r) = scene;
+        r#prevOnScreen
+
+    /// 前フレームの画面内ノードパスセットを設定する
+    pub def setPrevOnScreen(onScreen: Set[NodePath], scene: Scene[s]): Scene[s] =
+        let Scene.Scene(r) = scene;
+        Scene.Scene({ prevOnScreen = onScreen | r })
 
     /// SceneEntry のエンジンノードを取り出す
     def entryEngineNode(entry: SceneEntry[s]): EngineNode[s] =
@@ -123,7 +134,7 @@ pub mod Scene {
 
     /// 空のシーンを返す
     pub def empty(): Scene[s] =
-        Scene.Scene({ nodes = Map.empty(), prevOverlaps = Set.empty(), readied = false })
+        Scene.Scene({ nodes = Map.empty(), prevOverlaps = Set.empty(), prevOnScreen = Set.empty(), readied = false })
 
     /// ルートノードとして追加する（state は EngineNode[s] 内に含まれる）
     pub def addNode(name: NodeName, engineNode: EngineNode[s], scene: Scene[s]): Scene[s] =
@@ -348,8 +359,8 @@ pub mod Scene {
             Ref.get(sceneRef)
         }
 
-    /// 全ノードの ready を preorder で一度だけ呼び出し、readied フラグを設定する
-    pub def readyAll(scene: Scene[s]): Scene[s] \ Engine.Game with Node[s] =
+    /// 全ノードの ready を preorder で一度だけ呼び出し、readied フラグを設定する（エンジン内部用）
+    def readyAll(scene: Scene[s]): Scene[s] \ Engine.Game with Node[s] =
         let Scene.Scene(r) = scene;
         foldNodes((engineNode, path, sc) ->
             Node.ready(engineNode, path, sc),
