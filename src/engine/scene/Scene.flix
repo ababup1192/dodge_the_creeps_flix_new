@@ -5,7 +5,8 @@ pub type alias NodePath = List[NodeName]
 pub enum SceneEntry[s] {
     case SceneEntry({
         engineNode = EngineNode[s],
-        children = Map[NodeName, SceneEntry[s]]
+        children = Map[NodeName, SceneEntry[s]],
+        groups = Set[String]
     })
 }
 
@@ -15,7 +16,7 @@ pub enum Scene[s] {
         nodes = Map[NodeName, SceneEntry[s]],
         prevOverlaps = OverlapPairSet,
         prevOnScreen = Set[NodePath],
-        readied = Bool
+        readiedPaths = Set[NodePath]
     })
 }
 
@@ -134,12 +135,12 @@ pub mod Scene {
 
     /// 空のシーンを返す
     pub def empty(): Scene[s] =
-        Scene.Scene({ nodes = Map.empty(), prevOverlaps = Set.empty(), prevOnScreen = Set.empty(), readied = false })
+        Scene.Scene({ nodes = Map.empty(), prevOverlaps = Set.empty(), prevOnScreen = Set.empty(), readiedPaths = Set.empty() })
 
     /// ルートノードとして追加する（state は EngineNode[s] 内に含まれる）
     pub def addNode(name: NodeName, engineNode: EngineNode[s], scene: Scene[s]): Scene[s] =
         let Scene.Scene(r) = scene;
-        let entry = SceneEntry.SceneEntry({ engineNode = engineNode, children = Map.empty() });
+        let entry = SceneEntry.SceneEntry({ engineNode = engineNode, children = Map.empty(), groups = Set.empty() });
         Scene.Scene({ nodes = Map.insert(name, entry, r#nodes) | r })
 
     /// 親がルートの子追加
@@ -151,12 +152,39 @@ pub mod Scene {
         match getEntryAt(parentPath, scene) {
             case None => scene
             case Some(_) =>
-                let childEntry = SceneEntry.SceneEntry({ engineNode = engineNode, children = Map.empty() });
+                let childEntry = SceneEntry.SceneEntry({ engineNode = engineNode, children = Map.empty(), groups = Set.empty() });
                 modifyAt(parentPath, entry ->
                     let SceneEntry.SceneEntry(r) = entry;
                     SceneEntry.SceneEntry({ children = Map.insert(childName, childEntry, r#children) | r }),
                     scene)
         }
+
+    // ========================================================================
+    // グループ
+    // ========================================================================
+
+    /// ノードをグループに追加する
+    pub def addToGroup(path: NodePath, group: String, scene: Scene[s]): Scene[s] =
+        modifyAt(path, entry ->
+            let SceneEntry.SceneEntry(r) = entry;
+            SceneEntry.SceneEntry({ groups = Set.insert(group, r#groups) | r }),
+            scene)
+
+    /// グループ内の全ノードパスを返す
+    pub def getNodesInGroup(group: String, scene: Scene[s]): List[NodePath] =
+        let paths = preorderPaths(scene);
+        List.filter(path ->
+            match getEntryAt(path, scene) {
+                case Some(entry) =>
+                    let SceneEntry.SceneEntry(r) = entry;
+                    Set.memberOf(group, r#groups)
+                case None => false
+            }, paths)
+
+    /// グループ内の全ノードを削除する
+    pub def removeGroup(group: String, scene: Scene[s]): Scene[s] =
+        let paths = getNodesInGroup(group, scene);
+        List.foldLeft((sc, path) -> removeAt(path, sc), scene, paths)
 
     // ========================================================================
     // 取得
@@ -219,15 +247,19 @@ pub mod Scene {
     /// パスで削除
     pub def removeAt(path: NodePath, scene: Scene[s]): Scene[s] =
         let Scene.Scene(sr) = scene;
+        // 削除対象のサブツリー全パスを readiedPaths から除去する
+        let cleanReadied = Set.filter(rp -> not List.isPrefixOf(path, rp), sr#readiedPaths);
+        let cleaned = Scene.Scene({ readiedPaths = cleanReadied | sr });
+        let Scene.Scene(cr) = cleaned;
         match List.reverse(path) {
-            case Nil => scene
+            case Nil => cleaned
             case childName :: Nil =>
-                Scene.Scene({ nodes = Map.remove(childName, sr#nodes) | sr })
+                Scene.Scene({ nodes = Map.remove(childName, cr#nodes) | cr })
             case childName :: parentRev =>
                 modifyAt(List.reverse(parentRev), entry ->
                     let SceneEntry.SceneEntry(r) = entry;
                     SceneEntry.SceneEntry({ children = Map.remove(childName, r#children) | r }),
-                    scene)
+                    cleaned)
         }
 
     // ========================================================================
@@ -359,19 +391,27 @@ pub mod Scene {
             Ref.get(sceneRef)
         }
 
-    /// 全ノードの ready を preorder で一度だけ呼び出し、readied フラグを設定する（エンジン内部用）
-    def readyAll(scene: Scene[s]): Scene[s] \ GameEngine.Game with Node[s] =
-        let Scene.Scene(r) = scene;
+    /// 未 ready のノードだけ ready を呼び、readiedPaths に追加する（Godot add_child 準拠）
+    ///
+    /// Godot では add_child() 時に _ready() が発火する。
+    /// 本エンジンでは processAll の冒頭で毎フレームチェックし、
+    /// 動的に追加されたノードにも ready を呼ぶことで同等の挙動を実現する。
+    def readyNew(scene: Scene[s]): Scene[s] \ GameEngine.Game with Node[s] =
         foldNodes((engineNode, path, sc) ->
-            Node.ready(engineNode, path, sc),
-            Scene.Scene({ readied = true | r }))
+            let Scene.Scene(r) = sc;
+            if (not Set.memberOf(path, r#readiedPaths)) {
+                let (newEn, s1) = Node.ready(engineNode, path, sc);
+                let Scene.Scene(r1) = s1;
+                (newEn, Scene.Scene({ readiedPaths = Set.insert(path, r1#readiedPaths) | r1 }))
+            } else
+                (engineNode, sc),
+            scene)
 
     /// 全ノードの process を preorder（親→子）の順で呼び出す
     /// EngineNode.engineProcess（AnimSprite2D のフレーム送り等）も自動実行される
-    /// 初回呼び出し時に readyAll を自動実行する
+    /// 未 ready のノードがあれば先に ready を呼ぶ（動的スポーン対応）
     pub def processAll(delta: Float64, paused: Bool, scene: Scene[s]): Scene[s] \ GameEngine.Game with Node[s] =
-        let Scene.Scene(r) = scene;
-        let readiedScene = if (not r#readied) readyAll(scene) else scene;
+        let readiedScene = readyNew(scene);
         foldNodes((engineNode, path, sc) ->
             if (ProcessMode.shouldProcess(paused, Node.getProcessMode(EngineNode.getState(engineNode)))) {
                 let newEn = EngineNode.engineProcess(delta, engineNode);

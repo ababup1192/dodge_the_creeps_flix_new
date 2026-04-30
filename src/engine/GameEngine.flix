@@ -87,22 +87,27 @@ mod GameEngine {
         Scene.processAll(delta, paused, scene)
 
     /// 物理演算（重力・ダンピング・速度積分）を適用する
-    pub def physics(delta: Float64, paused: Bool, gravity: Vec2.Vec2,
+    pub def physicsProcess(delta: Float64, paused: Bool, gravity: Vec2.Vec2,
                     scene: Scene[s]): Scene[s]
             with Node[s] =
         PhysicsStep.step(delta, paused, gravity, scene)
 
     /// エリア衝突を検出し AreaHandler で応答する
-    pub def collisions(scene: Scene[s]): Scene[s]
+    pub def emitCollision(scene: Scene[s]): Scene[s]
             with AreaHandler[s] =
         AreaEvent.handleOverlaps(scene)
 
-    /// 画面外に出たノードに ScreenNotifyHandler で通知する
-    pub def offscreen(screenWidth: {screenWidth = Int32},
+    /// 画面内外の遷移を検出し ScreenNotifyHandler で通知する
+    pub def emitScreenNotify(screenWidth: {screenWidth = Int32},
                       screenHeight: {screenHeight = Int32},
                       scene: Scene[s]): Scene[s]
             with ScreenNotifyHandler[s] =
-        ScreenNotifyEvent.handleScreenExited(screenWidth, screenHeight, scene)
+        ScreenNotifyEvent.handleScreenNotify(screenWidth, screenHeight, scene)
+
+    /// タイマータイムアウトを検出し TimerHandler で応答する
+    pub def emitTimers(scene: Scene[s]): Scene[s]
+            with TimerEvent.TimerHandler[s] =
+        TimerEvent.handleTimeouts(scene)
 
     /// シーンを描画する
     pub def render(scene: Scene[s]): Unit \ Game =

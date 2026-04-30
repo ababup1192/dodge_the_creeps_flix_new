@@ -18,22 +18,22 @@ pub mod TimerEvent {
         pub def onTimeout(_timerPath: NodePath, _state: s, scene: Scene[s]): Scene[s] = scene
     }
 
-    /// timedOut=true のノードパスを収集する
-    pub def detectTimeoutPaths(scene: Scene[s]): List[NodePath] with Node[s] =
+    /// timedOut=true の TimerWithState ノードパスを収集する
+    pub def detectTimeoutPaths(scene: Scene[s]): List[NodePath] =
         let paths = Scene.preorderPaths(scene);
         List.filterMap(path ->
-            match Scene.getState(path, scene) {
-                case Some(state) =>
-                    if (Node.isTimedOut(state)) Some(path)
+            match Scene.getEngineNode(path, scene) {
+                case Some(EngineNode.TimerWithState(timer, _)) =>
+                    if (Timer.isTimedOut(timer)) Some(path)
                     else None
-                case None => None
+                case _ => None
             }, paths)
 
     /// タイムアウトを処理し、フラグをクリアする
     /// 1. detectTimeoutPaths で対象パスを収集
     /// 2. 各パスに対して TimerHandler.onTimeout を呼び出し
-    /// 3. 各パスの clearTimedOut を呼び出してフラグをリセット
-    pub def handleTimeouts(scene: Scene[s]): Scene[s] with Node[s], TimerHandler[s] =
+    /// 3. 各パスの Timer.clearTimedOut を呼び出してフラグをリセット
+    pub def handleTimeouts(scene: Scene[s]): Scene[s] with TimerHandler[s] =
         let timedOutPaths = detectTimeoutPaths(scene);
         // onTimeout を呼び出し
         let sceneAfterHandlers = List.foldLeft((sc, path) ->
@@ -45,7 +45,7 @@ pub mod TimerEvent {
             timedOutPaths);
         // timedOut フラグをクリア
         List.foldLeft((sc, path) ->
-            Scene.mapState(path, state -> Node.clearTimedOut(state), sc),
+            Scene.mapEngineNode(path, EngineNode.mapTimer(Timer.clearTimedOut), sc),
             sceneAfterHandlers,
             timedOutPaths)
 }

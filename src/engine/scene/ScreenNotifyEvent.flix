@@ -1,15 +1,15 @@
-/// 画面外検出とハンドラ発火（Godot VisibleOnScreenNotifier2D シグナル準拠）
+/// 画面内外検出とハンドラ発火（Godot VisibleOnScreenNotifier2D シグナル準拠）
 ///
 /// ScreenNotifier2DWithState 子ノードを持つ親ノードを自動検出し、
-/// 画面外に出たときに onScreenExited を発火する。
+/// 画面外に出たときに onScreenExited、画面内に入ったときに onScreenEntered を発火する。
 ///
-/// AreaEvent パターンを踏襲し、画面外に出たノードに onScreenExited を発火する。
-/// Scene 内の prevOnScreen を使ってフレーム間の状態遷移を検出する。
+/// AreaEvent パターンを踏襲し、Scene 内の prevOnScreen を使ってフレーム間の状態遷移を検出する。
 ///
 ///   フレーム N:   Mob は画面内 → prevOnScreen に登録
 ///   フレーム N+1: Mob は画面外 → prevOnScreen にあるので onScreenExited 発火
 ///
-/// これにより、スポーン直後（まだ画面に入っていない）ノードは除外される。
+///   フレーム N:   Mob は画面外 → prevOnScreen に未登録
+///   フレーム N+1: Mob は画面内 → prevOnScreen になかったので onScreenEntered 発火
 
 pub mod ScreenNotifyEvent {
 
@@ -22,11 +22,10 @@ pub mod ScreenNotifyEvent {
 
     /// Scene 内の ScreenNotifier2DWithState 子ノードを検出し、
     /// その親ノードの画面内外を判定する。
-    /// 前フレームに画面内だった親ノードが画面外に出た場合に
-    /// ScreenNotifyHandler.onScreenExited をディスパッチする。
+    /// 前フレームとの差分から onScreenExited / onScreenEntered を発火する。
     ///
     /// prevOnScreen を更新して返す。
-    pub def handleScreenExited(
+    pub def handleScreenNotify(
             screenWidth: {screenWidth = Int32},
             screenHeight: {screenHeight = Int32},
             scene: Scene[s]): Scene[s] with ScreenNotifyHandler[s] =
@@ -49,7 +48,7 @@ pub mod ScreenNotifyEvent {
             paths);
         // Step 2: 前フレーム画面内 → 今フレーム画面外の親ノードに onScreenExited を発火
         let exitedPaths = Set.difference(prevOnScreen, currentOnScreen);
-        let updatedScene = Set.foldLeft((sc, path) ->
+        let sceneAfterExited = Set.foldLeft((sc, path) ->
             match Scene.getState(path, sc) {
                 case Some(state) =>
                     ScreenNotifyHandler.onScreenExited(path, state, sc)
@@ -57,5 +56,15 @@ pub mod ScreenNotifyEvent {
             },
             scene,
             exitedPaths);
-        Scene.setPrevOnScreen(currentOnScreen, updatedScene)
+        // Step 3: 前フレーム画面外 → 今フレーム画面内の親ノードに onScreenEntered を発火
+        let enteredPaths = Set.difference(currentOnScreen, prevOnScreen);
+        let sceneAfterEntered = Set.foldLeft((sc, path) ->
+            match Scene.getState(path, sc) {
+                case Some(state) =>
+                    ScreenNotifyHandler.onScreenEntered(path, state, sc)
+                case None => sc
+            },
+            sceneAfterExited,
+            enteredPaths);
+        Scene.setPrevOnScreen(currentOnScreen, sceneAfterEntered)
 }

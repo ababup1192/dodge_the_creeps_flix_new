@@ -50,15 +50,15 @@ def vecToTuple(v: Vec2.Vec2): (Float64, Float64) = (v#x, v#y)
 // buildState: ノード数・構造
 // ========================================================================
 
-/// シーンにはプレイヤーノードが 1 つだけ存在する
+/// シーンにはプレイヤー + Area2D + mob_timer + mob_path = 4 ノード
 @Test
 def testBuildSceneNodeCount(): Unit \ Assert =
-    Assert.assertEq(expected = 2, Scene.nodeCount(testScene()))
+    Assert.assertEq(expected = 4, Scene.nodeCount(testScene()))
 
-/// ルートノードは 1 つ
+/// ルートノードは 3 つ（player + mob_timer + mob_path）
 @Test
 def testBuildSceneRootCount(): Unit \ Assert =
-    Assert.assertEq(expected = 1, Map.size(Scene.states(testScene())))
+    Assert.assertEq(expected = 3, Map.size(Scene.states(testScene())))
 
 // ========================================================================
 // buildState: プレイヤー配置

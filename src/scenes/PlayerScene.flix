@@ -30,9 +30,9 @@ mod PlayerScene {
     def walkAnimation(): String = "walk"
     def upAnimation(): String = "up"
 
-    /// プレイヤーの衝突形状（半径 30 の円）
+    /// プレイヤーの衝突形状（Godot: CapsuleShape2D radius=27, height=68 を円で近似）
     def playerCollisionShape(): CollisionShape2D =
-        CollisionShape2D.CircleShape2D({radius = 30.0})
+        CollisionShape2D.CircleShape2D({radius = 27.0})
 
     /// プレイヤーのアニメーション定義
     def playerAnimations(): Map[String, List[String]] =
@@ -52,7 +52,7 @@ mod PlayerScene {
             initialAnimation = walkAnimation(),
             fps = 6.0,
             startPosition(),
-            {x = 1.0, y = 1.0});
+            {x = 0.5, y = 0.5});
         let area = Area2D.make(Vec2.zero(), playerCollisionShape());
         let playerNode: PlayerNode = { sprite = sprite, area = area };
         scene

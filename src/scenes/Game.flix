@@ -4,14 +4,15 @@
 pub enum GameData {
     case Player(PlayerScene.PlayerNode, PlayerScene.PlayerData)
     case PlayerArea
-    case MobData
+    case MobData(Int32)
     case MobSprite
     case MobNotifier
+    case MobTimer(Int32)
+    case MobPath
 }
 
 pub type alias GameState = {
     scene = Scene[GameData],
-    mobSpawnTimer = Float64,
     mobCounter = Int32
 }
 
@@ -19,13 +20,24 @@ pub type alias GameState = {
 
 instance Node[GameData] {
     redef ready(node: EngineNode[GameData],
-                _path: NodePath, scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) \ GameEngine.Game =
+                path: NodePath, scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) \ GameEngine.Game =
         match node {
             case EngineNode.AnimSprite2DWithState(sprite, GameData.Player(playerNode, playerData)) =>
                 let (readySprite, readyPlayerData) = PlayerScene.ready(sprite, playerData);
                 (EngineNode.AnimSprite2DWithState(readySprite,
                     GameData.Player({ sprite = readySprite | playerNode }, readyPlayerData)), scene
                 )
+            case EngineNode.RigidBody2DWithState(_, GameData.MobData(_)) =>
+                let rot = Node2D.getRotation(node);
+                let newScene = unsafe IO { Math.Random.runWithIO(_ -> MobScene.ready(path, rot, scene)) };
+                // MobScene.ready が path のノードに linearVelocity を設定するため、
+                // 更新済みノードをシーンから取り直す（foldNodes の上書きを防ぐ）
+                match Scene.getEngineNode(path, newScene) {
+                    case Some(en) => (en, newScene)
+                    case None => (node, newScene)
+                }
+            case EngineNode.TimerWithState(timer, GameData.MobTimer(counter)) =>
+                (EngineNode.TimerWithState(Timer.start(timer), GameData.MobTimer(counter)), scene)
             case _ => (node, scene)
         }
 
@@ -47,7 +59,7 @@ instance AreaHandler[GameData] {
                           _otherPath: NodePath, otherState: GameData,
                           scene: Scene[GameData]): Scene[GameData] =
         match (selfState, otherState) {
-            case (GameData.PlayerArea, GameData.MobData) =>
+            case (GameData.PlayerArea, GameData.MobData(_)) =>
                 PlayerScene.mapSprite(CanvasItem.hide, scene)
             case _ => scene
         }
@@ -59,7 +71,23 @@ instance ScreenNotifyHandler[GameData] {
     redef onScreenExited(path: NodePath, state: GameData,
                          scene: Scene[GameData]): Scene[GameData] =
         match state {
-            case GameData.MobData => Scene.removeAt(path, scene)
+            case GameData.MobData(_) => Scene.removeAt(path, scene)
+            case _ => scene
+        }
+}
+
+// ── TimerHandler 実装 ──
+
+instance TimerEvent.TimerHandler[GameData] {
+    redef onTimeout(timerPath: NodePath, state: GameData,
+                    scene: Scene[GameData]): Scene[GameData] =
+        match state {
+            case GameData.MobTimer(counter) =>
+                let newScene = unsafe IO { Math.Random.runWithIO(_ ->
+                    Game.spawnMobFromPath(counter, scene)
+                ) };
+                // カウンタをインクリメント
+                Scene.setState(timerPath, GameData.MobTimer(counter + 1), newScene)
             case _ => scene
         }
 }
@@ -74,12 +102,34 @@ mod Game {
     pub def screenHi(): Int32 = 720
 
     // ========================================================================
+    // Mob スポーン（TimerHandler から呼ばれる）
+    // ========================================================================
+
+    /// Path2D ベースで Mob をスポーンする
+    pub def spawnMobFromPath(counter: Int32, scene: Scene[GameData]): Scene[GameData] \ Math.Random =
+        let t = Math.Random.randomFloat64();
+        let sample = Path2D.sample(t, Path2D.screenEdgePath(screenWi(), screenHi()));
+        let name = MobScene.mobName(counter);
+        let newScene = MobScene.spawnMob(name, sample#position, counter, scene);
+        // direction を RigidBody2D の rotation に仮保存（ready で使う）
+        let mobPath = name :: Nil;
+        newScene
+            |> Scene.mapEngineNode(mobPath,
+                EngineNode.mapRigidBody2D(body -> Node2D.setRotation(sample#direction, body)))
+
+    // ========================================================================
     // 初期状態構築
     // ========================================================================
 
     pub def buildState(_fontAtlas: FontAtlas): GameState =
-        {   scene = Scene.empty() |> PlayerScene.addPlayer,
-            mobSpawnTimer = 1.0,
+        let timer = Timer.make(0.5) |> Timer.setOneShot(false);
+        let mobPath = Path2D.screenEdgePath(screenWi(), screenHi());
+        {   scene = Scene.empty()
+                |> PlayerScene.addPlayer
+                |> Scene.addNode("mob_timer",
+                    EngineNode.TimerWithState(timer, GameData.MobTimer(0)))
+                |> Scene.addNode("mob_path",
+                    EngineNode.Path2DWithState(mobPath, GameData.MobPath)),
             mobCounter = 0
         }
 
@@ -102,7 +152,7 @@ mod Game {
         {x = xDir, y = yDir}
 
     // ========================================================================
-    // メインル��プ
+    // メインループ
     // ========================================================================
 
     pub def start(fontAtlas: FontAtlas): Unit \ GameEngine.Game =
@@ -121,13 +171,13 @@ mod Game {
             let updateScene =
                 PlayerScene.applyInput(dir)
                 >> GameEngine.process(dt, false)
-                >> GameEngine.physics(dt, false,  PhysicsStep.defaultGravity())
-                >> GameEngine.collisions
-                >> GameEngine.offscreen(screenWidth = screenWi(), screenHeight = screenHi());
+                >> GameEngine.physicsProcess(dt, false,  PhysicsStep.defaultGravity())
+                >> GameEngine.emitCollision
+                >> GameEngine.emitScreenNotify(screenWidth = screenWi(), screenHeight = screenHi())
+                >> GameEngine.emitTimers;
             let updatedScene = updateScene(state#scene);
             GameEngine.render(updatedScene);
             { scene = updatedScene | state }
-                |> MobScene.maybeSpawnMob(dt)
                 |> gameLoop(fontAtlas)
         }
 }
