@@ -73,7 +73,8 @@ instance AreaHandler[GameData] {
             case (GameData.PlayerArea, GameData.MobData(_)) =>
                 scene |> PlayerScene.mapPlayer((playerNode, playerData) ->
                     ({ sprite = CanvasItem.hide(playerNode#sprite),
-                       area = Area2D.setMonitoring(false, playerNode#area) }, playerData))
+                       area = Area2D.setMonitoring(false, playerNode#area) },
+                     { hit = true | playerData }))
             case _ => scene
         }
 }
@@ -277,14 +278,10 @@ mod Game {
                     { scene = updatedScene, phase = nextPhase | state }
                 case GamePhase.Playing =>
                     let updatedScene = inputAndUpdate(dt, state#scene);
-                    match Scene.getEngineNode("player" :: Nil, updatedScene) {
-                        case Some(en) =>
-                            if (not CanvasItem.isVisible(en))
-                                gameOver({ scene = updatedScene | state })
-                            else
-                                { scene = updatedScene | state }
-                        case None => { scene = updatedScene | state }
-                    }
+                    if (PlayerScene.getPlayerData(updatedScene)#hit)
+                        gameOver({ scene = updatedScene | state })
+                    else
+                        { scene = updatedScene | state }
                 case GamePhase.GameOver =>
                     let updatedScene = engineUpdate(dt, state#scene);
                     if (HUDScene.isStartButtonVisible(updatedScene))

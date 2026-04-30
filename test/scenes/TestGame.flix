@@ -761,7 +761,8 @@ def testParentHideHidesChildDrawables(): Unit \ Assert =
     let hasTrailBefore = List.exists(d -> d#zIndex == 9, visibleDrawables);
     Assert.assertTrue(hasTrailBefore);
     // player hide → trail も Drawable から消える（visible 伝播）
-    let hiddenScene = scene |> PlayerScene.mapSprite(CanvasItem.hide);
+    let hiddenScene = scene |> PlayerScene.mapPlayer((playerNode, playerData) ->
+        ({ sprite = CanvasItem.hide(playerNode#sprite) | playerNode }, playerData));
     let hiddenDrawables = Scene.toDrawables(hiddenScene);
     let hasTrailAfter = List.exists(d -> d#zIndex == 9, hiddenDrawables);
     Assert.assertFalse(hasTrailAfter)
@@ -772,7 +773,8 @@ def testParentModulatePropagates(): Unit \ Assert =
     let scene = testReadyScene()
         |> PlayerScene.start({x = 240.0, y = 450.0})
         // player の modulate を赤(1,0,0)に設定
-        |> PlayerScene.mapSprite(CanvasItem.setModulate({r = 1.0f32, g = 0.0f32, b = 0.0f32}));
+        |> PlayerScene.mapPlayer((playerNode, playerData) ->
+            ({ sprite = CanvasItem.setModulate({r = 1.0f32, g = 0.0f32, b = 0.0f32}, playerNode#sprite) | playerNode }, playerData));
     let drawables = Scene.toDrawables(scene);
     // trail の Drawable を取得（zIndex == -1 は trail のパーティクル）
     let trailDrawables = List.filter(d -> d#zIndex == -1, drawables);
