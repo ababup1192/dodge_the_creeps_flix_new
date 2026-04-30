@@ -38,10 +38,10 @@ mod HUDScene {
         let hud = CanvasLayer.make(1);
         let scoreLabel = Label2D.make("0", fontAtlas, 60.0)
             |> Label2D.setCentered(true)
-            |> Node2D.setPosition({x = 240.0, y = 48.0});
+            |> Node2D.setPosition({x = 240.0, y = 0.0});
         let messageLabel = Label2D.make("Dodge the\nCreeps", fontAtlas, 60.0)
             |> Label2D.setCentered(true)
-            |> Node2D.setPosition({x = 240.0, y = 329.0});
+            |> Node2D.setPosition({x = 240.0, y = 281.0});
         let startButton = Button.make("Start", fontAtlas, 60.0, {x = 180.0, y = 100.0})
             |> Node2D.setPosition({x = 150.0, y = 520.0});
         let messageTimer = Timer.make(1.0);

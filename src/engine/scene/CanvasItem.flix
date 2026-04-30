@@ -21,6 +21,10 @@ pub trait CanvasItem[a] {
     pub def getViewportRect(_node: a): Rect2.Rect2 \ GameEngine.Game =
         GameEngine.Game.getViewportRect()
 
+    // 自身のみの描画色（子には伝播しない — Godot self_modulate 準拠）
+    pub def getSelfModulate(_node: a): Color = {r = 1.0f32, g = 1.0f32, b = 1.0f32}
+    pub def setSelfModulate(_color: Color, node: a): a = node
+
     // デフォルト実装
     pub def show(node: a): a = CanvasItem.setVisible(true, node)
     pub def hide(node: a): a = CanvasItem.setVisible(false, node)

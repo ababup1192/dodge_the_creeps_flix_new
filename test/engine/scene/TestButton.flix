@@ -9,6 +9,9 @@ def buttonTestFontAtlas(): FontAtlas = {
     textureName = "font_test",
     fontSize = 32.0,
     textureSize = 512.0,
+    ascent = 0.0,
+    descent = 0.0,
+    lineGap = 0.0,
     glyphs = Map.empty()
 }
 
@@ -237,6 +240,9 @@ def realisticFontAtlas(): FontAtlas =
     {   textureName = "font_test",
         fontSize = 32.0,
         textureSize = 512.0,
+        ascent = 23.0,
+        descent = 1.0,
+        lineGap = 0.0,
         // 'S'=83 のみ登録
         glyphs = Map#{83 => glyph}
     }

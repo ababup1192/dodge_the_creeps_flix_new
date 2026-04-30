@@ -14,6 +14,7 @@ mod LwjglLayer {
     import org.lwjgl.stb.STBImage
     import org.lwjgl.stb.STBTruetype
     import org.lwjgl.stb.STBTTBakedChar
+    import org.lwjgl.stb.STBTTFontinfo
     import org.lwjgl.stb.STBVorbis
     import org.lwjgl.openal.AL
     import org.lwjgl.openal.AL10
@@ -337,10 +338,36 @@ mod LwjglLayer {
         discard fontBuffer.put(fontBytes);
         discard fontBuffer.flip();
 
-        // STBTruetype でフォントを焼き込む
+        // フォント情報を初期化し、em ベースの補正サイズを算出
+        // STBTruetype: ScaleForPixelHeight → ascent-descent = fontSize
+        // Godot/FreeType: em ベース → 1em = fontSize
+        // フォントの ascent-descent > unitsPerEm の場合、STBTruetype は小さくなるため補正が必要
+        let fontInfo = STBTTFontinfo.malloc();
+        discard STBTruetype.stbtt_InitFont(fontInfo, fontBuffer);
+        let emScale = Float32.toFloat64(
+            STBTruetype.stbtt_ScaleForMappingEmToPixels(fontInfo, f32(entry#fontSize)));
+        let phScale = Float32.toFloat64(
+            STBTruetype.stbtt_ScaleForPixelHeight(fontInfo, f32(entry#fontSize)));
+        let bakeSize = entry#fontSize * emScale / phScale;
+
+        // フォントの正式メトリクスを取得（hhea テーブル: ascent/descent/lineGap）
+        // em スケールで算出（Godot/FreeType 互換）
+        let metricStack = MemoryStack.stackPush();
+        let ascentBuf = metricStack.mallocInt(1);
+        let descentBuf = metricStack.mallocInt(1);
+        let lineGapBuf = metricStack.mallocInt(1);
+        STBTruetype.stbtt_GetFontVMetrics(fontInfo, ascentBuf, descentBuf, lineGapBuf);
+        let ascent = Int32.toFloat64(ascentBuf.get(0)) * emScale;
+        let descent = -1.0 * Int32.toFloat64(descentBuf.get(0)) * emScale;
+        let lineGap = Int32.toFloat64(lineGapBuf.get(0)) * emScale;
+        discard MemoryStack.stackPop();
+        fontInfo.free();
+
+        // em 補正済みサイズでフォントを焼き込む
+        discard fontBuffer.position(0);
         let cdata = STBTTBakedChar.malloc(charCount);
         let bitmap = BufferUtils.createByteBuffer(bitmapSize * bitmapSize);
-        discard STBTruetype.stbtt_BakeFontBitmap(fontBuffer, f32(entry#fontSize), bitmap, bitmapSize, bitmapSize, firstChar, cdata);
+        discard STBTruetype.stbtt_BakeFontBitmap(fontBuffer, f32(bakeSize), bitmap, bitmapSize, bitmapSize, firstChar, cdata);
 
         // GL_RED テクスチャとしてアップロード + swizzle で RGBA 化
         discard bitmap.position(0);
@@ -356,6 +383,8 @@ mod LwjglLayer {
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL33.GL_TEXTURE_SWIZZLE_A, GL11.GL_RED);
 
         // グリフメトリクスを構築（静的アクセサで各フィールドを取得）
+        // グリフは bakeSize で焼かれているが、atlas#fontSize = entry#fontSize (em ベース)
+        // → Label2D の scale = 1.0 でそのまま em ベースの表示サイズになる
         let bitmapSizeF = Int32.toFloat64(bitmapSize);
         let baseAddr = cdata.address();
         let structSize = 20i64;   // STBTTBakedChar: 4 shorts (8B) + 3 floats (12B) = 20B
@@ -388,6 +417,9 @@ mod LwjglLayer {
             textureName = texName,
             fontSize = entry#fontSize,
             textureSize = bitmapSizeF,
+            ascent = ascent,
+            descent = descent,
+            lineGap = lineGap,
             glyphs = glyphs
         };
         (atlas, texInfo)

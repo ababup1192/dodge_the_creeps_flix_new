@@ -79,7 +79,6 @@ instance AreaHandler[GameData] {
             case (GameData.PlayerArea, GameData.MobData(_)) =>
                 scene
                     |> PlayerScene.mapSprite(CanvasItem.hide)
-                    |> Scene.mapEngineNode("player" :: "trail" :: Nil, CanvasItem.hide)
             case _ => scene
         }
 }

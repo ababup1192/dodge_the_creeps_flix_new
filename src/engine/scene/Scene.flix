@@ -438,24 +438,32 @@ pub mod Scene {
             scene)
 
     // ========================================================================
-    // CanvasLayer コンテキスト
+    // DrawContext — 親子プロパティ伝播（Godot CanvasItem 準拠）
     // ========================================================================
 
-    /// パスの祖先を上から下へ辿り、CanvasLayer のレイヤーオフセットと可視性を返す
-    ///
-    /// CanvasLayer が見つかった場合:
-    ///   - layerOffset: layer * CanvasLayer.layerStride（子ノードの z-index に加算）
-    ///   - visible: 全祖先 CanvasLayer が可視であれば true
-    def canvasLayerContext(path: NodePath, scene: Scene[s]): {layerOffset = Int32, visible = Bool} =
-        canvasLayerContextWalk(Nil, path, scene, {layerOffset = 0, visible = true})
+    /// 2つの Color を成分ごとに乗算する（modulate 伝播用）
+    def mulColor(c1: Color, c2: Color): Color =
+        {r = c1#r * c2#r, g = c1#g * c2#g, b = c1#b * c2#b}
 
-    /// canvasLayerContext の内部実装（パスを上から下へ辿る末尾再帰）
-    def canvasLayerContextWalk(
+    /// パスの祖先を上から下へ辿り、描画コンテキストを返す
+    ///
+    /// 全祖先ノードの visible / modulate / zIndex を累積する。
+    /// CanvasLayer は layerOffset を設定し zOffset チェーンを断ち切る。
+    ///
+    ///   - visible: 全祖先の AND チェーン
+    ///   - modulate: 全祖先の色を乗算
+    ///   - zOffset: 祖先の zIndex 累積加算（CanvasLayer でリセット）
+    ///   - layerOffset: CanvasLayer の layer * layerStride
+    def drawContext(path: NodePath, scene: Scene[s]): {layerOffset = Int32, visible = Bool, modulate = Color, zOffset = Int32} =
+        drawContextWalk(Nil, path, scene, {layerOffset = 0, visible = true, modulate = {r = 1.0f32, g = 1.0f32, b = 1.0f32}, zOffset = 0})
+
+    /// drawContext の内部実装（パスを上から下へ辿る末尾再帰）
+    def drawContextWalk(
         prefix: NodePath,
         remaining: NodePath,
         scene: Scene[s],
-        ctx: {layerOffset = Int32, visible = Bool}
-    ): {layerOffset = Int32, visible = Bool} =
+        ctx: {layerOffset = Int32, visible = Bool, modulate = Color, zOffset = Int32}
+    ): {layerOffset = Int32, visible = Bool, modulate = Color, zOffset = Int32} =
         match remaining {
             case Nil => ctx
             // 最後の要素はノード自身なのでスキップ（祖先のみ検査）
@@ -463,12 +471,20 @@ pub mod Scene {
             case name :: rest =>
                 let currentPath = List.append(prefix, name :: Nil);
                 let newCtx = match getEngineNode(currentPath, scene) {
-                    case Some(EngineNode.CanvasLayerWithState(cl, _)) =>
-                        let CanvasLayer.CanvasLayer(r) = cl;
-                        {layerOffset = r#drawLayer * CanvasLayer.layerStride(), visible = ctx#visible and r#visible}
-                    case _ => ctx
+                    case Some(engineNode) =>
+                        let vis = ctx#visible and CanvasItem.isVisible(engineNode);
+                        let mc = mulColor(ctx#modulate, CanvasItem.getModulate(engineNode));
+                        match engineNode {
+                            case EngineNode.CanvasLayerWithState(cl, _) =>
+                                let CanvasLayer.CanvasLayer(r) = cl;
+                                // CanvasLayer は layerOffset を設定し、zOffset チェーンをリセット
+                                {layerOffset = r#drawLayer * CanvasLayer.layerStride(), visible = vis, modulate = mc, zOffset = 0}
+                            case _ =>
+                                {layerOffset = ctx#layerOffset, visible = vis, modulate = mc, zOffset = ctx#zOffset + CanvasItem.getZIndex(engineNode)}
+                        }
+                    case None => ctx
                 };
-                canvasLayerContextWalk(currentPath, rest, scene, newCtx)
+                drawContextWalk(currentPath, rest, scene, newCtx)
         }
 
     // ========================================================================
@@ -490,23 +506,29 @@ pub mod Scene {
             zIndex = CanvasItem.getZIndex(engineNode)
         }
 
+    /// Drawable にコンテキスト（zOffset + modulate 乗算）を適用する
+    def applyDrawContext(zOff: Int32, parentColor: Color, d: GameEngine.Drawable): GameEngine.Drawable =
+        let c = d#color;
+        let mc: Color = {r = parentColor#r * c#r, g = parentColor#g * c#g, b = parentColor#b * c#b};
+        let d1 = {zIndex = d#zIndex + zOff | d};
+        {color = mc | d1}
+
     /// 可視ノードを Drawable のリストに変換する
     /// 各ノードが複数 Drawable を返せるよう flatMap ベースで処理する
-    /// CanvasLayer の子ノードには layer に基づく z-index オフセットを適用する
+    /// 祖先の visible/modulate/zIndex が自動的に子ノードに伝播する（Godot 準拠）
     pub def toDrawables(scene: Scene[s]): List[GameEngine.Drawable] =
         preorderPaths(scene)
             |> List.flatMap(path ->
-                let clCtx = canvasLayerContext(path, scene);
-                // 祖先の CanvasLayer が非表示なら子ノードも描画しない
-                if (not clCtx#visible) Nil
+                let ctx = drawContext(path, scene);
+                // 祖先が非表示なら子ノードも描画しない
+                if (not ctx#visible) Nil
                 else
                     match getEngineNode(path, scene) {
                         case Some(engineNode) =>
                             if (CanvasItem.isVisible(engineNode)) {
                                 let drawables = GameEngine.Renderable.toDrawables(engineNode, globalPositionAt(path, scene));
-                                // レイヤーオフセットがある場合のみ z-index を加算
-                                if (clCtx#layerOffset == 0) drawables
-                                else List.map(d -> {zIndex = d#zIndex + clCtx#layerOffset | d}, drawables)
+                                let zOff = ctx#zOffset + ctx#layerOffset;
+                                List.map(applyDrawContext(zOff, ctx#modulate), drawables)
                             } else Nil
                         case None => Nil
                     }

@@ -103,6 +103,7 @@ mod PlayerScene {
     // ========================================================================
 
     /// Godot の start(pos) を再現: 位置設定 + 回転リセット + show
+    /// trail は visible 伝播により親（player）の表示に自動追従する
     pub def start(pos: Vec2.Vec2, scene: Scene[GameData]): Scene[GameData] =
         scene
             |> mapSprite(sprite ->
@@ -110,7 +111,6 @@ mod PlayerScene {
                     |> position(pos)
                     |> rotation(0.0)
                     |> show)
-            |> Scene.mapEngineNode(name() :: trailName() :: Nil, CanvasItem.show)
 
     // ========================================================================
     // 入力適用

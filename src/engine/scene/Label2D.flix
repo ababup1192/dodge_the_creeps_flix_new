@@ -60,7 +60,7 @@ mod Label2D {
         let Label2D.Label2D(r) = label;
         let atlas = r#fontAtlas;
         let scale = r#fontSize / atlas#fontSize;
-        let lineHeight = r#fontSize * TextLayout.lineHeightMultiplier();
+        let lineHeight = (atlas#ascent + atlas#descent + atlas#lineGap) * scale;
         let lines = TextLayout.splitLines(r#text);
         let result = List.foldLeft((acc, lineChars) -> {
             let lineIdx = acc#lineIdx;
@@ -79,7 +79,8 @@ mod Label2D {
             // レイアウト位置計算
             let positions = TextLayout.layoutPositions(advances, 0.0, scale, lineHeight);
             let yOff = Int32.toFloat64(lineIdx) * lineHeight;
-            let lineGlobalPos = {x = globalPos#x, y = globalPos#y + yOff};
+            let ascentOffset = atlas#ascent * scale;
+            let lineGlobalPos = {x = globalPos#x, y = globalPos#y + yOff + ascentOffset};
             // グリフごとに Drawable を生成
             let lineDrawables = List.filterMap(pair -> {
                 let (ch, penPos) = pair;

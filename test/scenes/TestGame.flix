@@ -45,6 +45,9 @@ def testFontAtlas(): FontAtlas = {
     textureName = "font_test",
     fontSize = 32.0,
     textureSize = 512.0,
+    ascent = 0.0,
+    descent = 0.0,
+    lineGap = 0.0,
     glyphs = Map.empty()
 }
 
@@ -521,7 +524,7 @@ def testStartButtonCenteredHorizontally(): Unit \ Assert =
 @Test
 def testMessageLabelPosition(): Unit \ Assert =
     let pos = Scene.globalPositionAt(HUDScene.messageLabelPath(), testScene());
-    Assert.assertEq(expected = (240.0, 320.0), vecToTuple(pos))
+    Assert.assertEq(expected = (240.0, 281.0), vecToTuple(pos))
 
 /// メッセージラベルの初期テキストが "Dodge the\nCreeps" であること
 @Test
@@ -738,3 +741,71 @@ def testGameOverStopsMusicAndPlaysDeath(): Unit \ Assert =
         discard Game.gameOver(testState())
     });
     Assert.assertEq(expected = "stop:music" :: "play:death" :: Nil, calls)
+
+// ========================================================================
+// DrawContext: 親子プロパティ伝播
+// ========================================================================
+
+/// 親 hide → 子（trail）も Drawable に含まれない（visible 伝播）
+@Test
+def testParentHideHidesChildDrawables(): Unit \ Assert =
+    let scene = testReadyScene()
+        |> PlayerScene.start({x = 240.0, y = 450.0});
+    // player visible → trail も Drawable に含まれる
+    let visibleDrawables = Scene.toDrawables(scene);
+    let hasTrailBefore = List.exists(d -> d#zIndex == -1, visibleDrawables);
+    Assert.assertTrue(hasTrailBefore);
+    // player hide → trail も Drawable から消える（visible 伝播）
+    let hiddenScene = scene |> PlayerScene.mapSprite(CanvasItem.hide);
+    let hiddenDrawables = Scene.toDrawables(hiddenScene);
+    let hasTrailAfter = List.exists(d -> d#zIndex == -1, hiddenDrawables);
+    Assert.assertFalse(hasTrailAfter)
+
+/// 親の modulate が子の Drawable の color に乗算される（modulate 伝播）
+@Test
+def testParentModulatePropagates(): Unit \ Assert =
+    let scene = testReadyScene()
+        |> PlayerScene.start({x = 240.0, y = 450.0})
+        // player の modulate を赤(1,0,0)に設定
+        |> PlayerScene.mapSprite(CanvasItem.setModulate({r = 1.0f32, g = 0.0f32, b = 0.0f32}));
+    let drawables = Scene.toDrawables(scene);
+    // trail の Drawable を取得（zIndex == -1 は trail のパーティクル）
+    let trailDrawables = List.filter(d -> d#zIndex == -1, drawables);
+    // trail の各パーティクルの color.g が 0 であること（親の赤 modulate が乗算）
+    let allGreenZero = List.forAll(d -> d#color#g == 0.0f32, trailDrawables);
+    Assert.assertTrue(allGreenZero)
+
+/// 親 zIndex=10, 子 zIndex=5 → effective zIndex=15（z_index 相対伝播）
+@Test
+def testZIndexRelativePropagation(): Unit \ Assert =
+    // parent (Sprite2D, zIndex=10)
+    //   +-- child (Sprite2D, zIndex=5)
+    let parent = Sprite2D.make("white", {x = 0.0, y = 0.0}, {x = 1.0, y = 1.0})
+        |> CanvasItem.setZIndex(10);
+    let child = Sprite2D.make("white", {x = 0.0, y = 0.0}, {x = 1.0, y = 1.0})
+        |> CanvasItem.setZIndex(5);
+    let scene: Scene[String] = Scene.empty()
+        |> Scene.addNode("parent", EngineNode.Sprite2DWithState(parent, "p"))
+        |> Scene.addChild("parent", "child", EngineNode.Sprite2DWithState(child, "c"));
+    let drawables = Scene.toDrawables(scene);
+    // child の effective zIndex = 5 (own) + 10 (parent) = 15
+    Assert.assertTrue(List.exists(d -> d#zIndex == 15, drawables))
+
+/// CanvasLayer の子は zOffset がリセットされる
+@Test
+def testCanvasLayerResetsZOffset(): Unit \ Assert =
+    // root (Sprite2D, zIndex=10)
+    //   +-- layer (CanvasLayer, drawLayer=1)
+    //     +-- child (Sprite2D, zIndex=5)
+    let root = Sprite2D.make("white", {x = 0.0, y = 0.0}, {x = 1.0, y = 1.0})
+        |> CanvasItem.setZIndex(10);
+    let cl = CanvasLayer.make(1);
+    let child = Sprite2D.make("white", {x = 0.0, y = 0.0}, {x = 1.0, y = 1.0})
+        |> CanvasItem.setZIndex(5);
+    let scene: Scene[String] = Scene.empty()
+        |> Scene.addNode("root", EngineNode.Sprite2DWithState(root, "r"))
+        |> Scene.addChild("root", "cl", EngineNode.CanvasLayerWithState(cl, "l"))
+        |> Scene.addChildAt("root" :: "cl" :: Nil, "child", EngineNode.Sprite2DWithState(child, "c"));
+    let drawables = Scene.toDrawables(scene);
+    // child の effective zIndex = 5 (own) + 0 (zOffset reset by CanvasLayer) + 10000 (layerOffset) = 10005
+    Assert.assertTrue(List.exists(d -> d#zIndex == 10005, drawables))
