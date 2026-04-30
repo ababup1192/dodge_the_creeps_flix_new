@@ -10,6 +10,10 @@
 mod MobScene {
     import java.lang.Math
 
+    /// body: Mob の物理ボディ（RigidBody2D）
+    /// sprite: Mob のアニメーションスプライト
+    pub type alias MobNode = { body = RigidBody2D, sprite = AnimatedSprite2D }
+
     /// 円周率
     def pi(): Float64 = 3.14159265358979
 
@@ -100,36 +104,62 @@ mod MobScene {
                 EngineNode.ScreenNotifier2DWithState(notifier, GameData.Marker))
 
     // ========================================================================
+    // mapMob: MobNode と MobData を一括で変換する
+    // ========================================================================
+
+    /// MobNode（body + sprite）と MobData（counter）を一括で変換する
+    pub def mapMob(mobPath: NodePath, f: (MobNode, Int32) -> (MobNode, Int32),
+                   scene: Scene[GameData]): Scene[GameData] =
+        let spritePath = List.append(mobPath, spriteName() :: Nil);
+        let opt = forA(
+            parent <- Scene.getEngineNode(mobPath, scene);
+            child  <- Scene.getEngineNode(spritePath, scene)
+        ) yield (parent, child);
+        let (mobNode, counter) = match opt {
+            case Some((EngineNode.RigidBody2DWithState(body, GameData.MobData(c)),
+                       EngineNode.AnimSprite2DWithState(sprite, _))) =>
+                ({ body = body, sprite = sprite }, c)
+            case _ => bug!("mob not found")
+        };
+        let (newNode, newCounter) = f(mobNode, counter);
+        scene
+            |> Scene.mapEngineNode(mobPath, en ->
+                match en {
+                    case EngineNode.RigidBody2DWithState(_, GameData.MobData(_)) =>
+                        EngineNode.RigidBody2DWithState(newNode#body, GameData.MobData(newCounter))
+                    case other => other
+                })
+            |> Scene.mapEngineNode(spritePath,
+                EngineNode.mapAnimSprite2D(_ -> newNode#sprite))
+
+    // ========================================================================
     // ready: アニメーション選択 + linearVelocity 設定（Godot _ready 準拠）
     // ========================================================================
+
+    /// アニメーション名に応じた FPS を返す（Godot mob.tscn 準拠: fly=3, swim=4, walk=4）
+    def fpsForAnimation(animation: String): Float64 =
+        if (animation == flyAnimation()) 3.0
+        else 4.0
 
     /// Mob の ready 処理: ランダムにアニメーション（fly/swim/walk）を選択し、
     /// ランダムな方向・速度で linearVelocity を設定する。
     ///
     /// direction は spawnMob 時に設定された direction に ±π/4 のランダム偏差を加え、
     /// speed は 150〜250 の範囲でランダムに決定する。
-    /// アニメーション名に応じた FPS を返す（Godot mob.tscn 準拠: fly=3, swim=4, walk=4）
-    def fpsForAnimation(animation: String): Float64 =
-        if (animation == flyAnimation()) 3.0
-        else 4.0
-
     pub def ready(path: NodePath, direction: Float64, scene: Scene[GameData]): Scene[GameData] \ Math.Random =
         let animation = pickAnimation();
-        let spritePath = List.append(path, spriteName() :: Nil);
         let pi = pi();
         let dirOffset = RandomUtil.randomRange(0.0 - pi / 4.0, pi / 4.0);
         let finalDir = direction + dirOffset;
         let speed = RandomUtil.randomRange(150.0, 250.0);
         let vx = cos(finalDir) * speed;
         let vy = sin(finalDir) * speed;
-        scene
-            |> Scene.mapEngineNode(spritePath,
-                EngineNode.mapAnimSprite2D(sprite ->
-                    sprite
-                        |> AnimatedSprite2D.play(animation)
-                        |> AnimatedSprite2D.setFps(fpsForAnimation(animation))
-                        |> Node2D.setRotation(finalDir)))
-            |> Scene.mapEngineNode(path,
-                EngineNode.mapRigidBody2D(RigidBody2D.setLinearVelocity({x = vx, y = vy})))
+        scene |> mapMob(path, (mobNode, counter) ->
+            ({ body = RigidBody2D.setLinearVelocity({x = vx, y = vy}, mobNode#body),
+               sprite = mobNode#sprite
+                   |> AnimatedSprite2D.play(animation)
+                   |> AnimatedSprite2D.setFps(fpsForAnimation(animation))
+                   |> Node2D.setRotation(finalDir) },
+             counter))
 
 }

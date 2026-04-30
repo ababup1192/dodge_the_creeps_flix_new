@@ -18,11 +18,11 @@ mod PlayerScene {
     /// プレイヤーノード名
     def name(): String = "player"
 
-    /// Area2D 子ノード名
-    def areaName(): String = "area"
+    /// プレイヤーノードのパス
+    def playerPath(): NodePath = name() :: Nil
 
-    /// Trail 子ノード名
-    def trailName(): String = "trail"
+    /// Area2D 子ノードのパス
+    def areaPath(): NodePath = name() :: "area" :: Nil
 
     /// プレイヤー初期位置（Godot 版準拠）
     def startPosition(): Vec2.Vec2 = {x = 240.0, y = 450.0}
@@ -66,9 +66,9 @@ mod PlayerScene {
             |> Scene.addNode(name(),
                 EngineNode.AnimSprite2DWithState(sprite,
                     GameData.Player(playerNode, {velocity = Vec2.zero(), screenSize = Vec2.zero(), hit = false})))
-            |> Scene.addChild(name(), areaName(),
+            |> Scene.addChild(name(), "area",
                 EngineNode.Area2DWithState(area, GameData.PlayerArea))
-            |> Scene.addChild(name(), trailName(),
+            |> Scene.addChild(name(), "trail",
                 EngineNode.GPUParticles2DWithState(
                     GPUParticles2D.make({
                         texture = "playerGrey_walk1",
@@ -150,27 +150,30 @@ mod PlayerScene {
     /// PlayerNode と PlayerData を一括で変換する（sprite・area・データを同時に更新）
     pub def mapPlayer(f: (PlayerNode, PlayerData) -> (PlayerNode, PlayerData),
                       scene: Scene[GameData]): Scene[GameData] =
-        let (playerNode, playerData) = match (Scene.getEngineNode(name() :: Nil, scene),
-                                              Scene.getEngineNode(name() :: areaName() :: Nil, scene)) {
-            case (Some(EngineNode.AnimSprite2DWithState(s, GameData.Player(_, pd))),
-                  Some(EngineNode.Area2DWithState(a, _))) => ({ sprite = s, area = a }, pd)
+        let opt = forA(
+            parent <- Scene.getEngineNode(playerPath(), scene);
+            child  <- Scene.getEngineNode(areaPath(), scene)
+        ) yield (parent, child);
+        let (playerNode, playerData) = match opt {
+            case Some((EngineNode.AnimSprite2DWithState(s, GameData.Player(_, pd)),
+                       EngineNode.Area2DWithState(a, _))) => ({ sprite = s, area = a }, pd)
             case _ => bug!("player not found")
         };
         let (newNode, newData) = f(playerNode, playerData);
         scene
-            |> Scene.mapEngineNode(name() :: Nil, en ->
+            |> Scene.mapEngineNode(playerPath(), en ->
                 match en {
                     case EngineNode.AnimSprite2DWithState(_, GameData.Player(_, _)) =>
                         EngineNode.AnimSprite2DWithState(newNode#sprite,
                             GameData.Player(newNode, newData))
                     case other => other
                 })
-            |> Scene.mapEngineNode(name() :: areaName() :: Nil,
+            |> Scene.mapEngineNode(areaPath(),
                 EngineNode.mapArea2D(_ -> newNode#area))
 
     /// Scene から PlayerData を取り出す
     pub def getPlayerData(scene: Scene[GameData]): PlayerData =
-        match Scene.getState(name() :: Nil, scene) {
+        match Scene.getState(playerPath(), scene) {
             case Some(GameData.Player(_, playerData)) => playerData
             case _ => bug!("player data not found")
         }

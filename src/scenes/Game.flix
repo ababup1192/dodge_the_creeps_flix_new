@@ -140,12 +140,11 @@ mod Game {
         let t = Math.Random.randomFloat64();
         let sample = Path2D.sample(t, Path2D.screenEdgePath(screenWi(), screenHi()));
         let name = MobScene.mobName(counter);
-        let newScene = MobScene.spawnMob(name, sample#position, counter, scene);
-        // direction を RigidBody2D の rotation に仮保存（ready で使う）
         let mobPath = name :: Nil;
-        newScene
-            |> Scene.mapEngineNode(mobPath,
-                EngineNode.mapRigidBody2D(body -> Node2D.setRotation(sample#direction, body)))
+        // direction を RigidBody2D の rotation に仮保存（ready で使う）
+        MobScene.spawnMob(name, sample#position, counter, scene)
+            |> MobScene.mapMob(mobPath, (mobNode, c) ->
+                ({ body = Node2D.setRotation(sample#direction, mobNode#body) | mobNode }, c))
 
     // ========================================================================
     // 初期状態構築
