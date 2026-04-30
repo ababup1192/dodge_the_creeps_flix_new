@@ -4,10 +4,14 @@
 pub enum GameData {
     case Player(PlayerScene.PlayerNode, PlayerScene.PlayerData)
     case PlayerArea
+    case MobData
+    case MobSprite
 }
 
 pub type alias GameState = {
-    scene = Scene[GameData]
+    scene = Scene[GameData],
+    mobSpawnTimer = Float64,
+    mobCounter = Int32
 }
 
 // ── Node 実装 ──
@@ -58,7 +62,10 @@ mod Game {
     // ========================================================================
 
     pub def buildState(_fontAtlas: FontAtlas): GameState =
-        { scene = Scene.empty() |> PlayerScene.addPlayer }
+        {   scene = Scene.empty() |> PlayerScene.addPlayer,
+            mobSpawnTimer = 1.0,
+            mobCounter = 0
+        }
 
     // ========================================================================
     // 入力
@@ -79,14 +86,17 @@ mod Game {
         {x = xDir, y = yDir}
 
     // ========================================================================
-    // メインループ
+    // メインル��プ
     // ========================================================================
 
     pub def start(fontAtlas: FontAtlas): Unit \ Engine.Game =
         let state = buildState(fontAtlas);
-        let startedState: GameState = {
-            scene = PlayerScene.start({x = 240.0, y = 360.0}, state#scene)
+        let readyState: GameState = {
+            scene = Scene.readyAll(state#scene)
             | state };
+        let startedState: GameState = {
+            scene = PlayerScene.start({x = 240.0, y = 360.0}, readyState#scene)
+            | readyState };
         gameLoop(fontAtlas, startedState)
 
     def gameLoop(fontAtlas: FontAtlas, state: GameState): Unit \ Engine.Game =
@@ -95,10 +105,13 @@ mod Game {
         else {
             let dt = Engine.Game.getDeltaTime();
             let dir = readInputDirection();
+            let gravity = PhysicsStep.defaultGravity();
             { scene = state#scene
                 |> PlayerScene.applyInput(dir)
-                |> GameEngine.update(dt, false)
+                |> GameEngine.updateWithPhysicsAndAreaHandler(dt, false, gravity)
+                |> MobScene.removeOffScreenMobs
               | state }
+                |> MobScene.maybeSpawnMob(dt)
                 |> gameLoop(fontAtlas)
         }
 }

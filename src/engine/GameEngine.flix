@@ -32,6 +32,21 @@ mod GameEngine {
         render(processedScene);
         processedScene
 
+    /// 1 フレーム分の更新（物理 + AreaHandler 方式）:
+    /// processAll → PhysicsStep → AreaEvent → render
+    ///
+    /// RigidBody2D の重力・ダンピング・速度積分を行い、
+    /// その後エリアイベントを検出・ハンドリングする。
+    pub def updateWithPhysicsAndAreaHandler(
+            delta: Float64, paused: Bool, gravity: Vec2.Vec2,
+            scene: Scene[s]): Scene[s] \ Engine.Game
+            with Node[s], AreaHandler[s] =
+        let processedScene = Scene.processAll(delta, paused, scene)
+            |> PhysicsStep.step(delta, paused, gravity)
+            |> AreaEvent.handleOverlaps;
+        render(processedScene);
+        processedScene
+
     /// 描画: Scene.toDrawables で Drawable リストを取得し、描画する
     pub def render(scene: Scene[s]): Unit \ Engine.Game =
         Scene.toDrawables(scene) |> Engine.Game.render

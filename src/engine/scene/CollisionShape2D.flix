@@ -7,11 +7,19 @@
 ///   CollisionShape2D
 ///     +-- RectShape2D: 軸平行の矩形（AABB）
 ///     +-- CircleShape2D: 円
+///     +-- CapsuleShape2D: カプセル（両端が半円の矩形）
 ///
 /// すべての判定関数は形状の **中心座標** を基準として受け取る。
 pub enum CollisionShape2D {
+    /// 軸平行の矩形
     case RectShape2D({width = Float64, height = Float64})
+    /// 円
     case CircleShape2D({radius = Float64})
+    /// カプセル（Godot CapsuleShape2D 準拠）
+    /// radius: 半円の半径
+    /// height: カプセル全体の高さ（両端の半円を含む）
+    /// vertical: true なら縦長、false なら横長
+    case CapsuleShape2D({radius = Float64, height = Float64, vertical = Bool})
 }
 
 mod CollisionShape2D {
@@ -25,15 +33,37 @@ mod CollisionShape2D {
     pub def checkOverlap(posA: Vec2.Vec2, shapeA: CollisionShape2D,
                           posB: Vec2.Vec2, shapeB: CollisionShape2D): Bool =
         match (shapeA, shapeB) {
+            // Rect vs Rect
             case (CollisionShape2D.RectShape2D(ra), CollisionShape2D.RectShape2D(rb)) =>
                 checkRectRect(posA, {x = ra#width, y = ra#height},
                               posB, {x = rb#width, y = rb#height})
+            // Circle vs Circle
             case (CollisionShape2D.CircleShape2D(ca), CollisionShape2D.CircleShape2D(cb)) =>
                 checkCircleCircle(posA, ca#radius, posB, cb#radius)
+            // Circle vs Rect
             case (CollisionShape2D.CircleShape2D(ca), CollisionShape2D.RectShape2D(rb)) =>
                 checkCircleRect(posA, ca#radius, posB, {x = rb#width, y = rb#height})
+            // Rect vs Circle
             case (CollisionShape2D.RectShape2D(ra), CollisionShape2D.CircleShape2D(cb)) =>
                 checkCircleRect(posB, cb#radius, posA, {x = ra#width, y = ra#height})
+            // Capsule vs Circle
+            case (CollisionShape2D.CapsuleShape2D(ca), CollisionShape2D.CircleShape2D(cb)) =>
+                checkCapsuleCircle(posA, ca#radius, ca#height, ca#vertical, posB, cb#radius)
+            // Circle vs Capsule
+            case (CollisionShape2D.CircleShape2D(ca), CollisionShape2D.CapsuleShape2D(cb)) =>
+                checkCapsuleCircle(posB, cb#radius, cb#height, cb#vertical, posA, ca#radius)
+            // Capsule vs Rect
+            case (CollisionShape2D.CapsuleShape2D(ca), CollisionShape2D.RectShape2D(rb)) =>
+                checkCapsuleRect(posA, ca#radius, ca#height, ca#vertical,
+                                 posB, {x = rb#width, y = rb#height})
+            // Rect vs Capsule
+            case (CollisionShape2D.RectShape2D(ra), CollisionShape2D.CapsuleShape2D(cb)) =>
+                checkCapsuleRect(posB, cb#radius, cb#height, cb#vertical,
+                                 posA, {x = ra#width, y = ra#height})
+            // Capsule vs Capsule
+            case (CollisionShape2D.CapsuleShape2D(ca), CollisionShape2D.CapsuleShape2D(cb)) =>
+                checkCapsuleCapsule(posA, ca#radius, ca#height, ca#vertical,
+                                    posB, cb#radius, cb#height, cb#vertical)
         }
 
     // ========================================================================
@@ -88,4 +118,154 @@ mod CollisionShape2D {
             let cornerDx = dx - halfW;
             let cornerDy = dy - halfH;
             cornerDx * cornerDx + cornerDy * cornerDy < radius * radius
+
+    // ========================================================================
+    // カプセル形状のヘルパー
+    // ========================================================================
+
+    /// カプセルの軸線分の両端点を返す。
+    /// カプセルの中心座標 pos から、半径を除いた軸方向の両端を計算する。
+    ///
+    ///   縦向き (vertical=true):
+    ///       (A)        segA = pos + (0, -halfSeg)
+    ///       | |
+    ///       | |  pos
+    ///       | |
+    ///       (B)        segB = pos + (0, +halfSeg)
+    ///
+    ///   横向き (vertical=false):
+    ///   (A)------(B)   segA = pos + (-halfSeg, 0)
+    ///                  segB = pos + (+halfSeg, 0)
+    ///
+    pub def capsuleSegment(pos: Vec2.Vec2, radius: Float64, height: Float64,
+                            vertical: Bool): (Vec2.Vec2, Vec2.Vec2) =
+        let halfSeg = Float64.max(0.0, height / 2.0 - radius);
+        if (vertical)
+            ({x = pos#x, y = pos#y - halfSeg}, {x = pos#x, y = pos#y + halfSeg})
+        else
+            ({x = pos#x - halfSeg, y = pos#y}, {x = pos#x + halfSeg, y = pos#y})
+
+    /// 点から線分への最短距離の二乗を返す。
+    ///
+    ///        * point
+    ///       /|
+    ///      / |
+    ///   segA----segB
+    ///
+    pub def pointToSegmentDistSq(point: Vec2.Vec2,
+                                  segA: Vec2.Vec2, segB: Vec2.Vec2): Float64 =
+        let ab = Vec2.sub(segB, segA);
+        let ap = Vec2.sub(point, segA);
+        let abLenSq = Vec2.lengthSquared(ab);
+        if (abLenSq < 0.000001)
+            Vec2.distanceSquaredTo(point, segA)
+        else
+            let t = Float64.max(0.0, Float64.min(1.0, Vec2.dot(ap, ab) / abLenSq));
+            let closest = Vec2.add(segA, Vec2.mul(ab, t));
+            Vec2.distanceSquaredTo(point, closest)
+
+    /// 二つの 2D 線分が交差しているか判定する。
+    /// 交差の��積符号法を使用��る。
+    def segmentsIntersect(a1: Vec2.Vec2, a2: Vec2.Vec2,
+                           b1: Vec2.Vec2, b2: Vec2.Vec2): Bool =
+        let d1 = Vec2.cross(Vec2.sub(b2, b1), Vec2.sub(a1, b1));
+        let d2 = Vec2.cross(Vec2.sub(b2, b1), Vec2.sub(a2, b1));
+        let d3 = Vec2.cross(Vec2.sub(a2, a1), Vec2.sub(b1, a1));
+        let d4 = Vec2.cross(Vec2.sub(a2, a1), Vec2.sub(b2, a1));
+        (d1 * d2 < 0.0) and (d3 * d4 < 0.0)
+
+    /// 二つの線分間の最短距離の二乗を返す。
+    /// 2D 線分が交差する場合は 0 を返す。
+    /// それ以外��端点-線分距離の最小値を取る。
+    pub def segmentToSegmentDistSq(a1: Vec2.Vec2, a2: Vec2.Vec2,
+                                    b1: Vec2.Vec2, b2: Vec2.Vec2): Float64 =
+        let ab = Vec2.sub(a2, a1);
+        let cd = Vec2.sub(b2, b1);
+        let abLenSq = Vec2.lengthSquared(ab);
+        let cdLenSq = Vec2.lengthSquared(cd);
+        // 両方とも点の場合
+        if (abLenSq < 0.000001 and cdLenSq < 0.000001)
+            Vec2.distanceSquaredTo(a1, b1)
+        // 一方が点の場合
+        else if (abLenSq < 0.000001)
+            pointToSegmentDistSq(a1, b1, b2)
+        else if (cdLenSq < 0.000001)
+            pointToSegmentDistSq(b1, a1, a2)
+        // 線分が交差している場合
+        else if (segmentsIntersect(a1, a2, b1, b2))
+            0.0
+        else
+            // 4 通りの端点-線分距離の最小値を取る
+            let d1 = pointToSegmentDistSq(a1, b1, b2);
+            let d2 = pointToSegmentDistSq(a2, b1, b2);
+            let d3 = pointToSegmentDistSq(b1, a1, a2);
+            let d4 = pointToSegmentDistSq(b2, a1, a2);
+            Float64.min(Float64.min(d1, d2), Float64.min(d3, d4))
+
+    // ========================================================================
+    // カプセル形状の衝突判定
+    // ========================================================================
+
+    /// カプセルと円の重なり判定。
+    /// カプセルの軸線分と円の中心の距離が、両者の半径の和より小さいかで判定する。
+    ///
+    ///   (cap)      (circle)
+    ///    | |          O
+    ///    | |
+    ///
+    pub def checkCapsuleCircle(capsulePos: Vec2.Vec2, capsuleRadius: Float64,
+                                capsuleHeight: Float64, capsuleVertical: Bool,
+                                circlePos: Vec2.Vec2, circleRadius: Float64): Bool =
+        let (segA, segB) = capsuleSegment(capsulePos, capsuleRadius, capsuleHeight, capsuleVertical);
+        let distSq = pointToSegmentDistSq(circlePos, segA, segB);
+        let sumR = capsuleRadius + circleRadius;
+        distSq < sumR * sumR
+
+    /// カプセルと矩形の重なり判定。
+    /// カプセルの軸線分を半径分太らせた領域と矩形の重なりを判定する。
+    /// 矩形を半径分膨らませて（ミンコフスキー和）、軸線分との交差を判定する。
+    ///
+    ///   (cap)   +----+
+    ///    | |    |    |
+    ///    | |    +----+
+    ///
+    pub def checkCapsuleRect(capsulePos: Vec2.Vec2, capsuleRadius: Float64,
+                              capsuleHeight: Float64, capsuleVertical: Bool,
+                              rectPos: Vec2.Vec2, rectSize: Vec2.Vec2): Bool =
+        let (segA, segB) = capsuleSegment(capsulePos, capsuleRadius, capsuleHeight, capsuleVertical);
+        let halfW = rectSize#x / 2.0;
+        let halfH = rectSize#y / 2.0;
+        // 線分上の矩形中心への最近接点を求める
+        let ab = Vec2.sub(segB, segA);
+        let abLenSq = Vec2.lengthSquared(ab);
+        let ap = Vec2.sub(rectPos, segA);
+        let t = if (abLenSq < 0.000001) 0.0
+                else Float64.max(0.0, Float64.min(1.0, Vec2.dot(ap, ab) / abLenSq));
+        let closest = Vec2.add(segA, Vec2.mul(ab, t));
+        let dx = Float64.abs(closest#x - rectPos#x);
+        let dy = Float64.abs(closest#y - rectPos#y);
+        // 膨張矩形の辺領域（十字部分）にあれば重なる
+        if (dx >= halfW + capsuleRadius or dy >= halfH + capsuleRadius) false
+        else if (dx <= halfW or dy <= halfH) true
+        else
+            let cornerDx = dx - halfW;
+            let cornerDy = dy - halfH;
+            cornerDx * cornerDx + cornerDy * cornerDy < capsuleRadius * capsuleRadius
+
+    /// カプセル同士の重なり判定。
+    /// 二つの軸線分の最短距離が、両者の半径の和より小さいかで判定する。
+    ///
+    ///   (A)     (B)
+    ///    | |     | |
+    ///    | |     | |
+    ///
+    pub def checkCapsuleCapsule(posA: Vec2.Vec2, radiusA: Float64,
+                                 heightA: Float64, verticalA: Bool,
+                                 posB: Vec2.Vec2, radiusB: Float64,
+                                 heightB: Float64, verticalB: Bool): Bool =
+        let (segA1, segA2) = capsuleSegment(posA, radiusA, heightA, verticalA);
+        let (segB1, segB2) = capsuleSegment(posB, radiusB, heightB, verticalB);
+        let distSq = segmentToSegmentDistSq(segA1, segA2, segB1, segB2);
+        let sumR = radiusA + radiusB;
+        distSq < sumR * sumR
 }

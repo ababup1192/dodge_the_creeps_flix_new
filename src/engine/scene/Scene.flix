@@ -369,6 +369,16 @@ pub mod Scene {
                 (engineNode, sc),
             readiedScene)
 
+    /// 全ノードの physicsProcess を preorder で呼び出す。
+    /// PhysicsStep.step が重力・積分を適用する前に実行される。
+    pub def physicsProcessAll(delta: Float64, paused: Bool, scene: Scene[s]): Scene[s] with Node[s] =
+        foldNodes((engineNode, path, sc) ->
+            if (ProcessMode.shouldProcess(paused, Node.getProcessMode(EngineNode.getState(engineNode))))
+                Node.physicsProcess(delta, engineNode, path, sc)
+            else
+                (engineNode, sc),
+            scene)
+
     // ========================================================================
     // 描画（制約なし — EngineNode の Renderable を直接使用）
     // ========================================================================

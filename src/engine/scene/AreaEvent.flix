@@ -113,14 +113,12 @@ pub mod AreaEvent {
             Set.empty(),
             overlaps)
 
-    /// Scene.processAll + 重なり検出 + AreaHandler.onAreaEntered / onAreaExited ディスパッチ。
-    /// Scene 内の prevOverlaps を読み書きし、離脱したペアに onAreaExited を発火する。
-    pub def processAndEmitHandled(delta: Float64, paused: Bool,
-                                  scene: Scene[s]): Scene[s] \ Engine.Game
-            with Node[s], AreaHandler[s] =
+    /// processAll 済みの Scene に対してエリアイベントを検出・ハンドリングする。
+    /// AreaHandler.onAreaEntered / onAreaExited をディスパッチし、
+    /// prevOverlaps を更新して返す。
+    pub def handleOverlaps(scene: Scene[s]): Scene[s] with AreaHandler[s] =
         let prevOverlaps = Scene.getPrevOverlaps(scene);
-        let updated = Scene.processAll(delta, paused, scene);
-        let overlaps = detectOverlaps(updated);
+        let overlaps = detectOverlaps(scene);
         let currentPairs = toOverlapPairSet(overlaps);
         // 現在重なっているペアに onAreaEntered を発火
         let sceneAfterEnter = List.foldLeft((sc, ov) ->
@@ -129,7 +127,7 @@ pub mod AreaEvent {
                     AreaHandler.onAreaEntered(ov#selfPath, selfState, ov#other#path, otherState, sc)
                 case _ => sc
             },
-            updated,
+            scene,
             overlaps);
         // 前フレームにあって今フレームにないペアに onAreaExited を発火
         let exitedPairs = Set.difference(prevOverlaps, currentPairs);
@@ -143,6 +141,13 @@ pub mod AreaEvent {
             sceneAfterEnter,
             exitedPairs);
         Scene.setPrevOverlaps(currentPairs, sceneAfterExit)
+
+    /// Scene.processAll + 重なり検出 + AreaHandler.onAreaEntered / onAreaExited ディスパッチ。
+    /// Scene 内の prevOverlaps を読み書きし、離脱したペアに onAreaExited を発火する。
+    pub def processAndEmitHandled(delta: Float64, paused: Bool,
+                                  scene: Scene[s]): Scene[s] \ Engine.Game
+            with Node[s], AreaHandler[s] =
+        Scene.processAll(delta, paused, scene) |> handleOverlaps
 
     // ========================================================================
     // ヘルパー

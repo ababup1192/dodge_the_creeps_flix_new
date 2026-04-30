@@ -2,7 +2,9 @@
 /// see: https://docs.godotengine.org/en/stable/classes/class_node.html
 ///
 /// ライフサイクル:
-///   addNode → ready() → [毎フレーム] process(delta)
+///   addNode → ready()
+///     → [毎フレーム] process(delta)
+///     → [物理ステップ] physicsProcess(delta) → 重力・積分
 ///
 /// 全メソッドにデフォルト実装があり、必要なものだけオーバーライドすればよい。
 /// 型パラメータ s はゲーム固有の状態を表す。
@@ -18,6 +20,12 @@ pub trait Node[s] {
     /// 毎フレーム呼ばれる更新コールバック
     /// delta: 前フレームからの経過秒数（Float64）
     pub def process(_delta: Float64, node: EngineNode[s], _path: NodePath, scene: Scene[s]): (EngineNode[s], Scene[s]) =
+            (node, scene)
+
+    /// 物理ステップ中に呼ばれる更新コールバック（Godot _physics_process 準拠）
+    /// PhysicsStep.step の重力・積分の **前** に呼ばれる。
+    /// 力の適用・速度の変更など、物理演算に影響する処理をここに書く。
+    pub def physicsProcess(_delta: Float64, node: EngineNode[s], _path: NodePath, scene: Scene[s]): (EngineNode[s], Scene[s]) =
             (node, scene)
 
     // ── タイムアウト検出 ──
