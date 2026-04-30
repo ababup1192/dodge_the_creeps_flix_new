@@ -53,7 +53,7 @@ def vecToTuple(v: Vec2.Vec2): (Float32, Float32) = (v#x, v#y)
 /// シーンにはプレイヤーノードが 1 つだけ存在する
 @Test
 def testBuildSceneNodeCount(): Unit \ Assert =
-    Assert.assertEq(expected = 1, Scene.nodeCount(testScene()))
+    Assert.assertEq(expected = 2, Scene.nodeCount(testScene()))
 
 /// ルートノードは 1 つ
 @Test
@@ -94,8 +94,8 @@ def testPlayerWalkAnimation(): Unit \ Assert =
 @Test
 def testPlayerInitialVelocity(): Unit \ Assert =
     match Scene.get("player", testScene()) {
-        case Some(GameData.Player(r)) =>
-            Assert.assertEq(expected = (0.0f32, 0.0f32), vecToTuple(r#velocity))
+        case Some(GameData.Player(_, pd)) =>
+            Assert.assertEq(expected = (0.0f32, 0.0f32), vecToTuple(pd#velocity))
         case _ => bug!("player state mismatch")
     }
 
@@ -170,8 +170,8 @@ def testInputDirectionNone(): Unit \ Assert =
 def testApplyInputSetsVelocity(): Unit \ Assert =
     let scene = PlayerScene.applyInput({x = 1.0f32, y = 0.0f32}, testScene());
     match Scene.get("player", scene) {
-        case Some(GameData.Player(r)) =>
-            Assert.assertEq(expected = (400.0f32, 0.0f32), vecToTuple(r#velocity))
+        case Some(GameData.Player(_, pd)) =>
+            Assert.assertEq(expected = (400.0f32, 0.0f32), vecToTuple(pd#velocity))
         case _ => bug!("player state mismatch")
     }
 
@@ -180,8 +180,8 @@ def testApplyInputSetsVelocity(): Unit \ Assert =
 def testApplyInputZeroVelocity(): Unit \ Assert =
     let scene = PlayerScene.applyInput(Vec2.zero(), testScene());
     match Scene.get("player", scene) {
-        case Some(GameData.Player(r)) =>
-            Assert.assertEq(expected = (0.0f32, 0.0f32), vecToTuple(r#velocity))
+        case Some(GameData.Player(_, pd)) =>
+            Assert.assertEq(expected = (0.0f32, 0.0f32), vecToTuple(pd#velocity))
         case _ => bug!("player state mismatch")
     }
 
@@ -268,8 +268,9 @@ def testPlayerProcessMoves(): Unit \ Assert =
     let scene = testReadyScene()
         |> Scene.mapState("player" :: Nil, state ->
             match state {
-                case GameData.Player(playerData) =>
-                    GameData.Player({velocity = {x = 400.0f32, y = 0.0f32} | playerData})
+                case GameData.Player(pn, pd) =>
+                    GameData.Player(pn, {velocity = {x = 400.0f32, y = 0.0f32} | pd})
+                case other => other
             });
     let pos = scene |> Scene.processAll(0.1, false) |> Scene.globalPosition("player");
     Assert.assertEq(expected = (280.0f32, 360.0f32), vecToTuple(pos))
@@ -286,8 +287,9 @@ def testPlayerClampRight(): Unit \ Assert =
     let scene = testReadyScene()
         |> Scene.mapState("player" :: Nil, state ->
             match state {
-                case GameData.Player(playerData) =>
-                    GameData.Player({velocity = {x = 400.0f32, y = 0.0f32} | playerData})
+                case GameData.Player(pn, pd) =>
+                    GameData.Player(pn, {velocity = {x = 400.0f32, y = 0.0f32} | pd})
+                case other => other
             });
     let pos = scene |> Scene.processAll(1.0, false) |> Scene.globalPosition("player");
     Assert.assertEq(expected = (480.0f32, 360.0f32), vecToTuple(pos))
@@ -298,8 +300,9 @@ def testPlayerClampLeft(): Unit \ Assert =
     let scene = testReadyScene()
         |> Scene.mapState("player" :: Nil, state ->
             match state {
-                case GameData.Player(playerData) =>
-                    GameData.Player({velocity = {x = -400.0f32, y = 0.0f32} | playerData})
+                case GameData.Player(pn, pd) =>
+                    GameData.Player(pn, {velocity = {x = -400.0f32, y = 0.0f32} | pd})
+                case other => other
             });
     let pos = scene |> Scene.processAll(1.0, false) |> Scene.globalPosition("player");
     Assert.assertEq(expected = (0.0f32, 360.0f32), vecToTuple(pos))
@@ -344,8 +347,8 @@ def testSwitchAnimResetsFrame(): Unit \ Assert =
 def testReadySetsScreenSize(): Unit \ Assert =
     let scene = withMockEngine(() -> Scene.readyAll(testScene()));
     match Scene.get("player", scene) {
-        case Some(GameData.Player(r)) =>
-            Assert.assertEq(expected = (480.0f32, 720.0f32), vecToTuple(r#screenSize))
+        case Some(GameData.Player(_, pd)) =>
+            Assert.assertEq(expected = (480.0f32, 720.0f32), vecToTuple(pd#screenSize))
         case _ => bug!("player state mismatch")
     }
 
@@ -379,3 +382,23 @@ def testStartSetsPosition(): Unit \ Assert =
         |> PlayerScene.start({x = 100.0f32, y = 200.0f32});
     let pos = Scene.globalPosition("player", scene);
     Assert.assertEq(expected = (100.0f32, 200.0f32), vecToTuple(pos))
+
+// ========================================================================
+// Area2D 子ノード
+// ========================================================================
+
+/// プレイヤーに Area2D 子ノードが存在すること
+@Test
+def testPlayerAreaChildExists(): Unit \ Assert =
+    match Scene.getEngineNode("player" :: "area" :: Nil, testScene()) {
+        case Some(_) => Assert.assertTrue(true)
+        case None => bug!("player area child not found")
+    }
+
+/// Area2D 子ノードの状態が PlayerArea であること
+@Test
+def testPlayerAreaChildState(): Unit \ Assert =
+    match Scene.getState("player" :: "area" :: Nil, testScene()) {
+        case Some(GameData.PlayerArea) => Assert.assertTrue(true)
+        case _ => bug!("player area state mismatch")
+    }

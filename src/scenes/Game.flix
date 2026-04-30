@@ -2,7 +2,8 @@
 
 /// ゲーム固有の状態データ
 pub enum GameData {
-    case Player(PlayerScene.PlayerData)
+    case Player(PlayerScene.PlayerNode, PlayerScene.PlayerData)
+    case PlayerArea
 }
 
 pub type alias GameState = {
@@ -15,16 +16,16 @@ instance Node[GameData] {
     redef ready(node: EngineNode[GameData],
                 _path: NodePath, scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) \ Engine.Game =
         match node {
-            case EngineNode.AnimSprite2DWithState(sprite, GameData.Player(playerData)) =>
-                PlayerScene.ready(sprite, playerData, scene)
+            case EngineNode.AnimSprite2DWithState(sprite, GameData.Player(pn, pd)) =>
+                PlayerScene.ready(sprite, pn, pd, scene)
             case _ => checked_ecast((node, scene))
         }
 
     redef process(delta: Float64, node: EngineNode[GameData],
                     _path: NodePath, scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) =
         match node {
-            case EngineNode.AnimSprite2DWithState(sprite, GameData.Player(r)) =>
-                PlayerScene.process(delta, sprite, r, scene)
+            case EngineNode.AnimSprite2DWithState(sprite, GameData.Player(pn, pd)) =>
+                PlayerScene.process(delta, sprite, pn, pd, scene)
             case _ => (node, scene)
         }
 }
