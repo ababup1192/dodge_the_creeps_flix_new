@@ -12,7 +12,7 @@ mod PlayerScene {
     def name(): String = "player"
 
     /// プレイヤー初期位置（画面中央）
-    def start(): Vec2.Vec2 = {x = 240.0f32, y = 360.0f32}
+    def startPosition(): Vec2.Vec2 = {x = 240.0f32, y = 360.0f32}
 
     /// プレイヤー移動速度（px/秒）
     def speed(): Float32 = 400.0f32
@@ -42,7 +42,7 @@ mod PlayerScene {
                     playerAnimations(),
                     initialAnimation = walkAnimation(),
                     fps = 6.0f32,
-                start(),
+                startPosition(),
                     {x = 1.0f32, y = 1.0f32}),
                 GameData.Player({velocity = Vec2.zero(), screenSize = Vec2.zero()})),
             scene)
@@ -56,8 +56,8 @@ mod PlayerScene {
                   scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) \ Engine.Game =
         let viewportSize = Engine.Game.getViewportRect()#size;
         (EngineNode.AnimSprite2DWithState(
-            sprite, 
-            GameData.Player({screenSize = viewportSize | playerData})), 
+            CanvasItem.hide(sprite),
+            GameData.Player({screenSize = viewportSize | playerData})),
             scene
         )
 
@@ -88,6 +88,19 @@ mod PlayerScene {
             screenSize
         );
         Node2D.setPosition(newPos, sprite)
+
+    // ========================================================================
+    // ゲーム開始: 位置リセット + 表示
+    // ========================================================================
+
+    /// Godot の start(pos) を再現: 位置設定 + 回転リセット + show
+    pub def start(pos: Vec2.Vec2, scene: Scene[GameData]): Scene[GameData] =
+        scene |> Scene.mapEngineNode(name() :: Nil,
+            EngineNode.mapAnimSprite2D(sprite ->
+                sprite
+                    |> Node2D.setPosition(pos)
+                    |> Node2D.setRotation(0.0)
+                    |> CanvasItem.show))
 
     // ========================================================================
     // 入力適用

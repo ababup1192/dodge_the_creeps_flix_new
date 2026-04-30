@@ -78,7 +78,10 @@ mod Game {
     pub def start(fontAtlas: FontAtlas): Unit \ Engine.Game =
         let state = buildState(fontAtlas);
         let readyState: GameState = { scene = Scene.readyAll(state#scene) | state };
-        gameLoop(fontAtlas, readyState)
+        let startedState: GameState = {
+            scene = PlayerScene.start({x = 240.0f32, y = 360.0f32}, readyState#scene)
+            | readyState };
+        gameLoop(fontAtlas, startedState)
 
     def gameLoop(fontAtlas: FontAtlas, state: GameState): Unit \ Engine.Game =
         if (Engine.Game.shouldClose()) ()

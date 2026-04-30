@@ -348,3 +348,34 @@ def testReadySetsScreenSize(): Unit \ Assert =
             Assert.assertEq(expected = (480.0f32, 720.0f32), vecToTuple(r#screenSize))
         case _ => bug!("player state mismatch")
     }
+
+// ========================================================================
+// ready → hide / start → show ライフサイクル
+// ========================================================================
+
+/// readyAll 後にプレイヤーが非表示であること
+@Test
+def testReadyHidesPlayer(): Unit \ Assert =
+    let scene = testReadyScene();
+    match Scene.getEngineNode("player" :: Nil, scene) {
+        case Some(engineNode) => Assert.assertFalse(CanvasItem.isVisible(engineNode))
+        case None => bug!("player not found")
+    }
+
+/// start 後にプレイヤーが表示されること
+@Test
+def testStartShowsPlayer(): Unit \ Assert =
+    let scene = testReadyScene()
+        |> PlayerScene.start({x = 100.0f32, y = 200.0f32});
+    match Scene.getEngineNode("player" :: Nil, scene) {
+        case Some(engineNode) => Assert.assertTrue(CanvasItem.isVisible(engineNode))
+        case None => bug!("player not found")
+    }
+
+/// start で指定位置に配置されること
+@Test
+def testStartSetsPosition(): Unit \ Assert =
+    let scene = testReadyScene()
+        |> PlayerScene.start({x = 100.0f32, y = 200.0f32});
+    let pos = Scene.globalPosition("player", scene);
+    Assert.assertEq(expected = (100.0f32, 200.0f32), vecToTuple(pos))
