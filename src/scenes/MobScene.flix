@@ -76,63 +76,6 @@ mod MobScene {
     pub def mobName(counter: Int32): String = "mob_${counter}"
 
     // ========================================================================
-    // Mob スポーン
-    // ========================================================================
-
-    /// 新しい Mob をシーンに追加する（Godot mob.tscn 相当）
-    ///
-    /// RigidBody2D（gravity_scale = 0） + 子 AnimatedSprite2D（walk デフォルト）の構成。
-    /// アニメーション選択・velocity 設定は ready で行う（Godot _ready 準拠）。
-    pub def spawnMob(name: String, position: Vec2.Vec2, counter: Int32,
-                     scene: Scene[GameData]): Scene[GameData] =
-        let body = RigidBody2D.make(position, mobCollisionShape())
-            |> RigidBody2D.setGravityScale(0.0);
-        let sprite = AnimatedSprite2D.make(
-            mobAnimations(),
-            initialAnimation = walkAnimation(),
-            fps = 3.0,
-            Vec2.zero(),
-            mobScale());
-        let notifier = MobScene.mobNotifier();
-        scene
-            |> Scene.addNode(name,
-                EngineNode.RigidBody2DWithState(body, GameData.MobData(counter)))
-            |> Scene.addToGroup(name :: Nil, mobGroup())
-            |> Scene.addChild(name, spriteName(),
-                EngineNode.AnimSprite2DWithState(sprite, GameData.Marker))
-            |> Scene.addChild(name, notifierName(),
-                EngineNode.ScreenNotifier2DWithState(notifier, GameData.Marker))
-
-    // ========================================================================
-    // mapMob: MobNode と MobData を一括で変換する
-    // ========================================================================
-
-    /// MobNode（body + sprite）と MobData（counter）を一括で変換する
-    pub def mapMob(mobPath: NodePath, f: (MobNode, Int32) -> (MobNode, Int32),
-                   scene: Scene[GameData]): Scene[GameData] =
-        let spritePath = List.append(mobPath, spriteName() :: Nil);
-        let opt = forA(
-            parent <- Scene.getEngineNode(mobPath, scene);
-            child  <- Scene.getEngineNode(spritePath, scene)
-        ) yield (parent, child);
-        let (mobNode, counter) = match opt {
-            case Some((EngineNode.RigidBody2DWithState(body, GameData.MobData(c)),
-                       EngineNode.AnimSprite2DWithState(sprite, _))) =>
-                ({ body = body, sprite = sprite }, c)
-            case _ => bug!("mob not found")
-        };
-        let (newNode, newCounter) = f(mobNode, counter);
-        scene
-            |> Scene.mapEngineNode(mobPath, en ->
-                match en {
-                    case EngineNode.RigidBody2DWithState(_, GameData.MobData(_)) =>
-                        EngineNode.RigidBody2DWithState(newNode#body, GameData.MobData(newCounter))
-                    case other => other
-                })
-            |> Scene.mapEngineNode(spritePath,
-                EngineNode.mapAnimSprite2D(_ -> newNode#sprite))
-
-    // ========================================================================
     // ready: アニメーション選択 + linearVelocity 設定（Godot _ready 準拠）
     // ========================================================================
 
@@ -161,5 +104,74 @@ mod MobScene {
                    |> AnimatedSprite2D.setFps(fpsForAnimation(animation))
                    |> Node2D.setRotation(finalDir) },
              counter))
+
+    // ========================================================================
+    // Mob スポーン
+    // ========================================================================
+
+    /// 新しい Mob をシーンに追加する（Godot mob.tscn 相当）
+    ///
+    /// RigidBody2D（gravity_scale = 0） + 子 AnimatedSprite2D（walk デフォルト）の構成。
+    /// アニメーション選択・velocity 設定は ready で行う（Godot _ready 準拠）。
+    pub def spawnMob(name: String, position: Vec2.Vec2, counter: Int32,
+                     scene: Scene[GameData]): Scene[GameData] =
+        let body = RigidBody2D.make(position, mobCollisionShape())
+            |> RigidBody2D.setGravityScale(0.0);
+        let sprite = AnimatedSprite2D.make(
+            mobAnimations(),
+            initialAnimation = walkAnimation(),
+            fps = 3.0,
+            Vec2.zero(),
+            mobScale());
+        let notifier = MobScene.mobNotifier();
+        scene
+            |> Scene.addNode(name,
+                EngineNode.RigidBody2DWithState(body, GameData.MobData(counter)))
+            |> Scene.addToGroup(name :: Nil, mobGroup())
+            |> Scene.addChild(name, spriteName(),
+                EngineNode.AnimSprite2DWithState(sprite, GameData.Marker))
+            |> Scene.addChild(name, notifierName(),
+                EngineNode.ScreenNotifier2DWithState(notifier, GameData.Marker))
+
+    // ========================================================================
+    // ボイラープレート: MobNode の取り出し・書き戻し・変換
+    // ========================================================================
+    // XxxNode にフィールドを追加する場合:
+    //   1. extractXxx の forA に1行、yield と match パターンに1フィールド追加
+    //   2. commitXxx にパイプラインを1段追加して書き戻す
+    //   3. mapXxx は変更不要
+
+    /// MobNode（body + sprite）と MobData（counter）を一括で変換する
+    pub def mapMob(mobPath: NodePath, f: (MobNode, Int32) -> (MobNode, Int32),
+                   scene: Scene[GameData]): Scene[GameData] =
+        let (mobNode, counter) = extractMob(mobPath, scene);
+        let (newNode, newCounter) = f(mobNode, counter);
+        commitMob(mobPath, newNode, newCounter, scene)
+
+    /// シーンから XxxNode と XxxData を取り出す
+    /// フィールド追加時: forA に1行、yield と match パターンに1フィールド追加
+    def extractMob(mobPath: NodePath, scene: Scene[GameData]): (MobNode, Int32) =
+        let spritePath = List.append(mobPath, spriteName() :: Nil);
+        let mobNodeOpt = forA(
+            body   <- Scene.getEngineNode(mobPath, scene);
+            sprite <- Scene.getEngineNode(spritePath, scene)
+        ) yield { body = body, sprite = sprite };
+        match mobNodeOpt {
+            case Some({ body = EngineNode.RigidBody2DWithState(body, GameData.MobData(counter)),
+                        sprite = EngineNode.AnimSprite2DWithState(sprite, _) }) =>
+                ({ body = body, sprite = sprite }, counter)
+            case _ => bug!("mob not found")
+        }
+
+    /// XxxNode と XxxData をシーンに書き戻す
+    /// フィールド追加時: パスと EngineNode バリアントの組を1段追加する
+    def commitMob(mobPath: NodePath, mobNode: MobNode, counter: Int32,
+                  scene: Scene[GameData]): Scene[GameData] =
+        let spritePath = List.append(mobPath, spriteName() :: Nil);
+        scene
+            |> Scene.setEngineNode(mobPath,
+                EngineNode.RigidBody2DWithState(mobNode#body, GameData.MobData(counter)))
+            |> Scene.setEngineNode(spritePath,
+                EngineNode.AnimSprite2DWithState(mobNode#sprite, GameData.Marker))
 
 }

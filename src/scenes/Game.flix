@@ -102,8 +102,8 @@ instance TimerEvent.TimerHandler[GameData] {
                 Scene.setState(timerPath, GameData.MobTimer(counter + 1), newScene)
             case GameData.StartTimer =>
                 scene
-                    |> Scene.mapEngineNode("mob_timer" :: Nil, EngineNode.mapTimer(Timer.start))
-                    |> Scene.mapEngineNode("score_timer" :: Nil, EngineNode.mapTimer(Timer.start))
+                    |> Scene.mapEngineNode(Game.mobTimerPath(), EngineNode.mapTimer(Timer.start))
+                    |> Scene.mapEngineNode(Game.scoreTimerPath(), EngineNode.mapTimer(Timer.start))
                     |> HUDScene.hideMessage
             case GameData.ScoreTimer =>
                 match Scene.getState(HUDScene.scoreLabelPath(), scene) {
@@ -123,6 +123,22 @@ instance TimerEvent.TimerHandler[GameData] {
 }
 
 mod Game {
+
+    // ========================================================================
+    // ノード名・パス定数
+    // ========================================================================
+
+    def mobTimerName(): String = "mob_timer"
+    def startTimerName(): String = "start_timer"
+    def scoreTimerName(): String = "score_timer"
+
+    pub def mobTimerPath(): NodePath = mobTimerName() :: Nil
+    pub def startTimerPath(): NodePath = startTimerName() :: Nil
+    pub def scoreTimerPath(): NodePath = scoreTimerName() :: Nil
+
+    // オーディオキー
+    def musicKey(): String = "music"
+    def deathKey(): String = "death"
 
     // ========================================================================
     // 画面定数
@@ -166,14 +182,10 @@ mod Game {
         {   scene = Scene.empty()
                 |> Scene.addNode("background", bgNode)
                 |> PlayerScene.addPlayer
-                |> Scene.addNode("mob_timer",
-                    EngineNode.TimerWithState(mobTimer, GameData.MobTimer(0)))
-                |> Scene.addNode("mob_path",
-                    EngineNode.Path2DWithState(mobPath, GameData.Marker))
-                |> Scene.addNode("start_timer",
-                    EngineNode.TimerWithState(startTimer, GameData.StartTimer))
-                |> Scene.addNode("score_timer",
-                    EngineNode.TimerWithState(scoreTimer, GameData.ScoreTimer))
+                |> Scene.addNode(mobTimerName(), EngineNode.TimerWithState(mobTimer, GameData.MobTimer(0)))
+                |> Scene.addNode("mob_path", EngineNode.Path2DWithState(mobPath, GameData.Marker))
+                |> Scene.addNode(startTimerName(), EngineNode.TimerWithState(startTimer, GameData.StartTimer))
+                |> Scene.addNode(scoreTimerName(), EngineNode.TimerWithState(scoreTimer, GameData.ScoreTimer))
                 |> HUDScene.addHUD(fontAtlas),
             mobCounter = 0,
             phase = GamePhase.Menu
@@ -203,7 +215,7 @@ mod Game {
 
     /// Menu/GameOver → GetReady: プレイヤー表示、スコアリセット、GetReady メッセージ、BGM 再生
     pub def newGame(state: GameState): GameState \ GameEngine.Audio =
-        AudioStreamPlayer.play("music");
+        AudioStreamPlayer.play(musicKey());
         let scene = state#scene
             |> Scene.removeGroup(MobScene.mobGroup())
             |> PlayerScene.start({x = 240.0, y = 450.0})
@@ -212,16 +224,16 @@ mod Game {
             |> HUDScene.showMessage("Get Ready")
             |> HUDScene.updateScore(0)
             |> HUDScene.hideStartButton
-            |> Scene.mapEngineNode("start_timer" :: Nil, EngineNode.mapTimer(Timer.start));
+            |> Scene.mapEngineNode(startTimerPath(), EngineNode.mapTimer(Timer.start));
         { scene = scene, mobCounter = 0, phase = GamePhase.GetReady }
 
     /// Playing → GameOver: タイマー停止、GameOver メッセージ、MessageTimer 開始、BGM 停止 + 死亡 SE 再生
     pub def gameOver(state: GameState): GameState \ GameEngine.Audio =
-        AudioStreamPlayer.stop("music");
-        AudioStreamPlayer.play("death");
+        AudioStreamPlayer.stop(musicKey());
+        AudioStreamPlayer.play(deathKey());
         let scene = state#scene
-            |> Scene.mapEngineNode("mob_timer" :: Nil, EngineNode.mapTimer(Timer.stop))
-            |> Scene.mapEngineNode("score_timer" :: Nil, EngineNode.mapTimer(Timer.stop))
+            |> Scene.mapEngineNode(mobTimerPath(), EngineNode.mapTimer(Timer.stop))
+            |> Scene.mapEngineNode(scoreTimerPath(), EngineNode.mapTimer(Timer.stop))
             |> HUDScene.showMessage("Game Over")
             |> HUDScene.hideStartButton
             |> HUDScene.startMessageTimer;
@@ -269,7 +281,7 @@ mod Game {
                         { scene = updatedScene | state }
                 case GamePhase.GetReady =>
                     let updatedScene = inputAndUpdate(dt, state#scene);
-                    let nextPhase = match Scene.getEngineNode("mob_timer" :: Nil, updatedScene) {
+                    let nextPhase = match Scene.getEngineNode(mobTimerPath(), updatedScene) {
                         case Some(EngineNode.TimerWithState(timer, _)) =>
                             if (Timer.isRunning(timer)) GamePhase.Playing else GamePhase.GetReady
                         case _ => GamePhase.GetReady

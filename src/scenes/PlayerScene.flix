@@ -150,35 +150,49 @@ mod PlayerScene {
         else
             AnimatedSprite2D.stop(sprite)
 
+    // ========================================================================
+    // ボイラープレート: PlayerNode の取り出し・書き戻し・変換
+    // ========================================================================
+    // XxxNode にフィールドを追加する場合:
+    //   1. extractXxx の forA に1行、yield と match パターンに1フィールド追加
+    //   2. commitXxx にパイプラインを1段追加して書き戻す
+    //   3. mapXxx は変更不要
+
     /// PlayerNode と PlayerData を一括で変換する（sprite・area・データを同時に更新）
     pub def mapPlayer(f: (PlayerNode, PlayerData) -> (PlayerNode, PlayerData),
                       scene: Scene[GameData]): Scene[GameData] =
-        let opt = forA(
-            parent <- Scene.getEngineNode(playerPath(), scene);
-            child  <- Scene.getEngineNode(areaPath(), scene)
-        ) yield (parent, child);
-        let (playerNode, playerData) = match opt {
-            case Some((EngineNode.AnimSprite2DWithState(s, GameData.Player(_, pd)),
-                       EngineNode.Area2DWithState(a, _))) => ({ sprite = s, area = a }, pd)
-            case _ => bug!("player not found")
-        };
+        let (playerNode, playerData) = extractPlayer(scene);
         let (newNode, newData) = f(playerNode, playerData);
-        scene
-            |> Scene.mapEngineNode(playerPath(), en ->
-                match en {
-                    case EngineNode.AnimSprite2DWithState(_, GameData.Player(_, _)) =>
-                        EngineNode.AnimSprite2DWithState(newNode#sprite,
-                            GameData.Player(newNode, newData))
-                    case other => other
-                })
-            |> Scene.mapEngineNode(areaPath(),
-                EngineNode.mapArea2D(_ -> newNode#area))
+        commitPlayer(newNode, newData, scene)
 
     /// Scene から PlayerData を取り出す
     pub def getPlayerData(scene: Scene[GameData]): PlayerData =
-        match Scene.getState(playerPath(), scene) {
-            case Some(GameData.Player(_, playerData)) => playerData
-            case _ => bug!("player data not found")
+        extractPlayer(scene) |> snd
+
+
+    /// シーンから XxxNode と XxxData を取り出す
+    /// フィールド追加時: forA に1行、yield と match パターンに1フィールド追加
+    def extractPlayer(scene: Scene[GameData]): (PlayerNode, PlayerData) =
+        let playerNodeOpt = forA(
+            sprite <- Scene.getEngineNode(playerPath(), scene);
+            area  <- Scene.getEngineNode(areaPath(), scene)
+        ) yield { sprite = sprite, area = area };
+        match playerNodeOpt {
+            case Some({ sprite = EngineNode.AnimSprite2DWithState(sprite, GameData.Player(_, playerData)),
+                        area = EngineNode.Area2DWithState(area, _) }) =>
+                ({ sprite = sprite, area = area }, playerData)
+            case _ => bug!("player not found")
         }
+
+    /// XxxNode と XxxData をシーンに書き戻す
+    /// フィールド追加時: パスと EngineNode バリアントの組を1段追加する
+    def commitPlayer(playerNode: PlayerNode, playerData: PlayerData,
+                     scene: Scene[GameData]): Scene[GameData] =
+        scene
+            |> Scene.setEngineNode(playerPath(),
+                EngineNode.AnimSprite2DWithState(playerNode#sprite,
+                    GameData.Player(playerNode, playerData)))
+            |> Scene.setEngineNode(areaPath(),
+                EngineNode.Area2DWithState(playerNode#area, GameData.PlayerArea))
 
 }
