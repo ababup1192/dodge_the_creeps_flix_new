@@ -20,7 +20,7 @@ def main(): Unit \ IO =
             fontManifest =
                 {name = "default", path = "textures/Xolonium-Regular.ttf", fontSize = 32.0} ::
                 Nil,
-            clearColor = {r = 0.3f32, g = 0.3f32, b = 0.3f32}
+            clearColor = {r = 0.0f32, g = 0.0f32, b = 0.0f32}
         };
        
         run {

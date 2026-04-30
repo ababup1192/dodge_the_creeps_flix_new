@@ -9,6 +9,7 @@ pub enum GameData {
     case MobNotifier
     case MobTimer(Int32)
     case MobPath
+    case Background
 }
 
 pub type alias GameState = {
@@ -61,6 +62,7 @@ instance AreaHandler[GameData] {
         match (selfState, otherState) {
             case (GameData.PlayerArea, GameData.MobData(_)) =>
                 PlayerScene.mapSprite(CanvasItem.hide, scene)
+                    |> Scene.removeGroup(MobScene.mobGroup())
             case _ => scene
         }
 }
@@ -124,7 +126,16 @@ mod Game {
     pub def buildState(_fontAtlas: FontAtlas): GameState =
         let timer = Timer.make(0.5) |> Timer.setOneShot(false);
         let mobPath = Path2D.screenEdgePath(screenWi(), screenHi());
+        let bg = ColorRect.make(
+            {x = 480.0, y = 720.0},
+            {r = 0.219608f32, g = 0.372549f32, b = 0.380392f32}
+        );
+        let bgNode = EngineNode.ColorRectWithState(
+            CanvasItem.setZIndex(-100, bg),
+            GameData.Background
+        );
         {   scene = Scene.empty()
+                |> Scene.addNode("background", bgNode)
                 |> PlayerScene.addPlayer
                 |> Scene.addNode("mob_timer",
                     EngineNode.TimerWithState(timer, GameData.MobTimer(0)))
