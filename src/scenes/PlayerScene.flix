@@ -1,6 +1,7 @@
 // PlayerScene — Dodge the Creeps プレイヤーのシーン構築・移動・アニメーション
 
 mod PlayerScene {
+    use NodeBuilder.{position, rotation, show, hide}
 
     pub type alias PlayerData = {velocity = Vec2.Vec2, screenSize = Vec2.Vec2}
 
@@ -68,7 +69,7 @@ mod PlayerScene {
     pub def ready(sprite: AnimatedSprite2D, pn: PlayerNode, pd: PlayerData,
                   scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) \ Engine.Game =
         let viewportSize = Engine.Game.getViewportRect()#size;
-        let hiddenSprite = CanvasItem.hide(sprite);
+        let hiddenSprite = hide(sprite);
         let pn1 = { sprite = hiddenSprite | pn };
         (EngineNode.AnimSprite2DWithState(
             hiddenSprite,
@@ -104,7 +105,7 @@ mod PlayerScene {
             Vec2.zero(),
             screenSize
         );
-        Node2D.setPosition(newPos, sprite)
+        position(newPos, sprite)
 
     // ========================================================================
     // ゲーム開始: 位置リセット + 表示
@@ -115,9 +116,9 @@ mod PlayerScene {
         scene |> Scene.mapEngineNode(name() :: Nil,
             mapPlayerSprite(sprite ->
                 sprite
-                    |> Node2D.setPosition(pos)
-                    |> Node2D.setRotation(0.0)
-                    |> CanvasItem.show))
+                    |> position(pos)
+                    |> rotation(0.0)
+                    |> show))
 
     // ========================================================================
     // 入力適用
@@ -174,35 +175,17 @@ mod PlayerScene {
     // アニメーション制御
     // ========================================================================
 
-    /// アニメーション名が変わった場合のみフレームをリセットして再生する
-    def switchAnim(name: String, sprite: AnimatedSprite2D): AnimatedSprite2D =
-        let AnimatedSprite2D.AnimatedSprite2D(r) = sprite;
-        if (r#currentAnimation == name)
-            AnimatedSprite2D.AnimatedSprite2D({playing = true | r})
-        else
-            AnimatedSprite2D.play(name, sprite)
-
-    /// 水平反転を設定する
-    def setFlipH(h: Bool, sprite: AnimatedSprite2D): AnimatedSprite2D =
-        let AnimatedSprite2D.AnimatedSprite2D(r) = sprite;
-        AnimatedSprite2D.AnimatedSprite2D({flipH = h | r})
-
-    /// 垂直反転を設定する
-    def setFlipV(v: Bool, sprite: AnimatedSprite2D): AnimatedSprite2D =
-        let AnimatedSprite2D.AnimatedSprite2D(r) = sprite;
-        AnimatedSprite2D.AnimatedSprite2D({flipV = v | r})
-
     /// 入力方向に応じてアニメーション・反転・回転を設定する
     /// 本家 Godot 準拠: 横移動は walk + flipH + flipV=false、縦移動は up + rotation（下向きで PI）
     pub def setPlayerAnimation(dir: Vec2.Vec2, sprite: AnimatedSprite2D): AnimatedSprite2D =
         if (dir#x != 0.0f32)
-            sprite |> switchAnim(walkAnimation())
-                   |> setFlipV(false)
-                   |> setFlipH(dir#x < 0.0f32)
-                   |> Node2D.setRotation(0.0)
+            sprite |> AnimatedSprite2D.play(walkAnimation())
+                   |> AnimatedSprite2D.setFlipV(false)
+                   |> AnimatedSprite2D.setFlipH(dir#x < 0.0f32)
+                   |> rotation(0.0)
         else if (dir#y != 0.0f32)
-            sprite |> switchAnim(upAnimation())
-                   |> Node2D.setRotation(if (dir#y > 0.0f32) pi() else 0.0)
+            sprite |> AnimatedSprite2D.play(upAnimation())
+                   |> rotation(if (dir#y > 0.0f32) pi() else 0.0)
         else
             AnimatedSprite2D.stop(sprite)
 }

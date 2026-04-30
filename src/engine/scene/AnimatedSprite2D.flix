@@ -99,16 +99,20 @@ mod AnimatedSprite2D {
             }
         }
 
-    /// アニメーションを切り替える（フレーム 0 にリセット）
+    /// アニメーションを再生する（Godot 準拠）
+    /// 同じアニメーションなら再開（フレーム維持）、違えばリセットして再生
     pub def play(animationName: String, sprite: AnimatedSprite2D): AnimatedSprite2D =
         let AnimatedSprite2D.AnimatedSprite2D(r) = sprite;
-        AnimatedSprite2D.AnimatedSprite2D({
-            currentAnimation = animationName,
-            currentFrame = 0,
-            elapsed = 0.0f32,
-            playing = true
-            | r
-        })
+        if (r#currentAnimation == animationName)
+            AnimatedSprite2D.AnimatedSprite2D({playing = true | r})
+        else
+            AnimatedSprite2D.AnimatedSprite2D({
+                currentAnimation = animationName,
+                currentFrame = 0,
+                elapsed = 0.0f32,
+                playing = true
+                | r
+            })
 
     /// 再生を停止する
     pub def stop(sprite: AnimatedSprite2D): AnimatedSprite2D =
@@ -119,6 +123,16 @@ mod AnimatedSprite2D {
     pub def getCurrentAnimation(sprite: AnimatedSprite2D): String =
         let AnimatedSprite2D.AnimatedSprite2D(r) = sprite;
         r#currentAnimation
+
+    /// 水平反転を設定する
+    pub def setFlipH(h: Bool, sprite: AnimatedSprite2D): AnimatedSprite2D =
+        let AnimatedSprite2D.AnimatedSprite2D(r) = sprite;
+        AnimatedSprite2D.AnimatedSprite2D({flipH = h | r})
+
+    /// 垂直反転を設定する
+    pub def setFlipV(v: Bool, sprite: AnimatedSprite2D): AnimatedSprite2D =
+        let AnimatedSprite2D.AnimatedSprite2D(r) = sprite;
+        AnimatedSprite2D.AnimatedSprite2D({flipV = v | r})
 }
 
 // ── CanvasItem 実装 ──

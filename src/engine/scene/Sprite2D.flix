@@ -47,6 +47,16 @@ mod Sprite2D {
         let Sprite2D.Sprite2D(r) = sprite;
         Sprite2D.Sprite2D({texture = texture | r})
 
+    /// 水平反転を設定する
+    pub def setFlipH(h: Bool, sprite: Sprite2D): Sprite2D =
+        let Sprite2D.Sprite2D(r) = sprite;
+        Sprite2D.Sprite2D({flipH = h | r})
+
+    /// 垂直反転を設定する
+    pub def setFlipV(v: Bool, sprite: Sprite2D): Sprite2D =
+        let Sprite2D.Sprite2D(r) = sprite;
+        Sprite2D.Sprite2D({flipV = v | r})
+
     /// グローバル座標を受け取り Drawable に変換する
     pub def toDrawableAt(sprite: Sprite2D, globalPos: Vec2.Vec2): Engine.Drawable =
         let Sprite2D.Sprite2D(r) = sprite;
@@ -114,3 +124,4 @@ instance Node2D[Sprite2D] {
         let Sprite2D.Sprite2D(r) = sprite;
         Sprite2D.Sprite2D({ skew = skew | r })
 }
+
