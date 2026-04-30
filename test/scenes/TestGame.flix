@@ -5,7 +5,7 @@
 // ========================================================================
 
 def withMockEngine(f: Unit -> a \ {GameEngine.Game, Math.Random}): a =
-    unsafe IO { Math.Random.runWithIO(_ ->
+    run {
         run f() with handler GameEngine.Game {
             def render(_, k) = k(())
             def shouldClose(k) = k(false)
@@ -16,7 +16,10 @@ def withMockEngine(f: Unit -> a \ {GameEngine.Game, Math.Random}): a =
             def getFontAtlas(_, k) = k(testFontAtlas())
             def getViewportRect(k) = k(Rect2.fromSize({x = 480.0, y = 720.0}))
         }
-    ) }
+    } with handler Math.Random {
+        def randomFloat64(k) = k(0.5)
+        def randomInt64(k) = k(42i64)
+    }
 
 /// 指定キーが押されている GameEngine.Game ハンドラ
 def withKeysPressed(keys: Set[GameEngine.Key], f: Unit -> a \ GameEngine.Game): a =
@@ -755,12 +758,12 @@ def testParentHideHidesChildDrawables(): Unit \ Assert =
         |> PlayerScene.start({x = 240.0, y = 450.0});
     // player visible → trail も Drawable に含まれる
     let visibleDrawables = Scene.toDrawables(scene);
-    let hasTrailBefore = List.exists(d -> d#zIndex == -1, visibleDrawables);
+    let hasTrailBefore = List.exists(d -> d#zIndex == 9, visibleDrawables);
     Assert.assertTrue(hasTrailBefore);
     // player hide → trail も Drawable から消える（visible 伝播）
     let hiddenScene = scene |> PlayerScene.mapSprite(CanvasItem.hide);
     let hiddenDrawables = Scene.toDrawables(hiddenScene);
-    let hasTrailAfter = List.exists(d -> d#zIndex == -1, hiddenDrawables);
+    let hasTrailAfter = List.exists(d -> d#zIndex == 9, hiddenDrawables);
     Assert.assertFalse(hasTrailAfter)
 
 /// 親の modulate が子の Drawable の color に乗算される（modulate 伝播）
