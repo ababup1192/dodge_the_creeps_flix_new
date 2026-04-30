@@ -92,6 +92,7 @@ mod Label2D {
                         scale = {x = w / atlas#textureSize, y = h / atlas#textureSize},
                         rotation = 0.0,
                         color = r#modulate,
+                        alpha = 1.0f32,
                         centered = false,
                         uvOffset = {x = gm#s0, y = gm#t0},
                         uvScale = {x = gm#s1 - gm#s0, y = gm#t1 - gm#t0},

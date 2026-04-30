@@ -66,6 +66,7 @@ mod Sprite2D {
             scale = r#scale,
             rotation = r#rotation,
             color = r#modulate,
+            alpha = 1.0f32,
             centered = r#centered,
             uvOffset = {x = 0.0, y = 0.0},
             uvScale = {x = 1.0, y = 1.0},

@@ -34,6 +34,7 @@ mod GameEngine {
         scale = Vec2.Vec2,
         rotation = Float64,
         color = Color,
+        alpha = Float32,
         centered = Bool,
         uvOffset = Vec2.Vec2,
         uvScale = Vec2.Vec2,

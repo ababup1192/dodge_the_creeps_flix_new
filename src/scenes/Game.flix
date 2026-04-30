@@ -4,6 +4,7 @@
 pub enum GameData {
     case Player(PlayerScene.PlayerNode, PlayerScene.PlayerData)
     case PlayerArea
+    case PlayerTrail
     case MobData(Int32)
     case MobSprite
     case MobNotifier

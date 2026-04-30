@@ -63,12 +63,13 @@ mod LwjglLayer {
         "out vec4 color;\n" +
         "uniform sampler2D image;\n" +
         "uniform vec3 spriteColor;\n" +
+        "uniform float spriteAlpha;\n" +
         "uniform bool useTexture;\n" +
         "void main() {\n" +
         "    if (useTexture) {\n" +
-        "        color = vec4(spriteColor, 1.0) * texture(image, TexCoords);\n" +
+        "        color = vec4(spriteColor, spriteAlpha) * texture(image, TexCoords);\n" +
         "    } else {\n" +
-        "        color = vec4(spriteColor, 1.0);\n" +
+        "        color = vec4(spriteColor, spriteAlpha);\n" +
         "    }\n" +
         "}\n"
 
@@ -201,6 +202,7 @@ mod LwjglLayer {
 
     def drawSprite(shader: Int32, texture: Int32, vao: Int32,
                    pos: Vec2.Vec2, size: Vec2.Vec2, color: Color,
+                   alpha: Float32,
                    uvOff: Vec2.Vec2, uvSc: Vec2.Vec2, rot: Float64,
                    useTex: Bool): Unit \ IO =
         GL20.glUseProgram(shader);
@@ -220,6 +222,8 @@ mod LwjglLayer {
         GL20.glUniformMatrix4fv(modelLoc, false, model);
         let colorLoc = GL20.glGetUniformLocation(shader, "spriteColor");
         GL20.glUniform3f(colorLoc, color#r, color#g, color#b);
+        let alphaLoc = GL20.glGetUniformLocation(shader, "spriteAlpha");
+        GL20.glUniform1f(alphaLoc, alpha);
         let uvOffsetLoc = GL20.glGetUniformLocation(shader, "uvOffset");
         GL20.glUniform2f(uvOffsetLoc, f32(uvOff#x), f32(uvOff#y));
         let uvScaleLoc = GL20.glGetUniformLocation(shader, "uvScale");
@@ -279,7 +283,7 @@ mod LwjglLayer {
                 if (String.isEmpty(drawable#texture)) {
                     // テクスチャなし（ColorRect）: scale をそのままピクセルサイズとして使う
                     let displaySize: Vec2.Vec2 = drawable#scale;
-                    drawSprite(shader, 0, vao, drawable#position, displaySize, drawable#color, drawable#uvOffset, drawable#uvScale, drawable#rotation, false)
+                    drawSprite(shader, 0, vao, drawable#position, displaySize, drawable#color, drawable#alpha, drawable#uvOffset, drawable#uvScale, drawable#rotation, false)
                 } else {
                     match Map.get(drawable#texture, registry) {
                         case Some(texInfo) =>
@@ -290,7 +294,7 @@ mod LwjglLayer {
                                 {x = drawable#position#x - displayW / 2.0, y = drawable#position#y - displayH / 2.0}
                             else
                                 drawable#position;
-                            drawSprite(shader, texInfo#id, vao, pos, displaySize, drawable#color, drawable#uvOffset, drawable#uvScale, drawable#rotation, true)
+                            drawSprite(shader, texInfo#id, vao, pos, displaySize, drawable#color, drawable#alpha, drawable#uvOffset, drawable#uvScale, drawable#rotation, true)
                         case None => ()
                     }
                 }

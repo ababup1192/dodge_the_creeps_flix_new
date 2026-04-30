@@ -18,6 +18,9 @@ mod PlayerScene {
     /// Area2D 子ノード名
     def areaName(): String = "area"
 
+    /// Trail 子ノード名
+    def trailName(): String = "trail"
+
     /// プレイヤー初期位置（画面中央）
     def startPosition(): Vec2.Vec2 = {x = 240.0, y = 360.0}
 
@@ -61,6 +64,15 @@ mod PlayerScene {
                     GameData.Player(playerNode, {velocity = Vec2.zero(), screenSize = Vec2.zero()})))
             |> Scene.addChild(name(), areaName(),
                 EngineNode.Area2DWithState(area, GameData.PlayerArea))
+            |> Scene.addChild(name(), trailName(),
+                EngineNode.GPUParticles2DWithState(
+                    GPUParticles2D.make({
+                        texture = "playerGrey_walk1",
+                        amount = 10, lifetime = 1.0, speedScale = 2.0,
+                        startAlpha = 0.5f32, endAlpha = 0.0f32,
+                        startScale = 0.5, endScale = 0.324
+                    }) |> CanvasItem.setZIndex(-1),
+                    GameData.PlayerTrail))
 
     // ========================================================================
     // ready: ビューポートサイズ取得

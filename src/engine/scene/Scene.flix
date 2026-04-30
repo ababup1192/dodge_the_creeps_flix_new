@@ -414,7 +414,7 @@ pub mod Scene {
         let readiedScene = readyNew(scene);
         foldNodes((engineNode, path, sc) ->
             if (ProcessMode.shouldProcess(paused, Node.getProcessMode(EngineNode.getState(engineNode)))) {
-                let newEn = EngineNode.engineProcess(delta, engineNode);
+                let newEn = EngineNode.engineProcess(delta, path, sc, engineNode);
                 Node.process(delta, newEn, path, sc)
             } else
                 (engineNode, sc),
@@ -442,6 +442,7 @@ pub mod Scene {
             scale = Node2D.getScale(engineNode),
             rotation = Node2D.getRotation(engineNode),
             color = CanvasItem.getModulate(engineNode),
+            alpha = 1.0f32,
             centered = true,
             uvOffset = {x = 0.0, y = 0.0},
             uvScale = {x = 1.0, y = 1.0},

@@ -26,6 +26,8 @@ pub enum EngineNode[state] {
     case TimerWithState(Timer, state)
     /// 色付き矩形ノード（テクスチャなしの単色矩形）
     case ColorRectWithState(ColorRect, state)
+    /// GPU パーティクルエミッター（残像エフェクト）
+    case GPUParticles2DWithState(GPUParticles2D, state)
 }
 
 mod EngineNode {
@@ -43,6 +45,7 @@ mod EngineNode {
         case EngineNode.ScreenNotifier2DWithState(_, state) => state
         case EngineNode.TimerWithState(_, state) => state
         case EngineNode.ColorRectWithState(_, state) => state
+        case EngineNode.GPUParticles2DWithState(_, state) => state
     }
 
     /// EngineNode の state を置き換える
@@ -58,6 +61,7 @@ mod EngineNode {
         case EngineNode.ScreenNotifier2DWithState(inner, _) => EngineNode.ScreenNotifier2DWithState(inner, newState)
         case EngineNode.TimerWithState(inner, _) => EngineNode.TimerWithState(inner, newState)
         case EngineNode.ColorRectWithState(inner, _) => EngineNode.ColorRectWithState(inner, newState)
+        case EngineNode.GPUParticles2DWithState(inner, _) => EngineNode.GPUParticles2DWithState(inner, newState)
     }
 
     /// EngineNode の state に関数を適用する
@@ -73,6 +77,7 @@ mod EngineNode {
         case EngineNode.ScreenNotifier2DWithState(inner, state) => EngineNode.ScreenNotifier2DWithState(inner, f(state))
         case EngineNode.TimerWithState(inner, state) => EngineNode.TimerWithState(inner, f(state))
         case EngineNode.ColorRectWithState(inner, state) => EngineNode.ColorRectWithState(inner, f(state))
+        case EngineNode.GPUParticles2DWithState(inner, state) => EngineNode.GPUParticles2DWithState(inner, f(state))
     }
 
     /// Timer の inner node に関数を適用する
@@ -125,12 +130,17 @@ mod EngineNode {
 
     /// エンジンレベルの毎フレーム処理
     /// AnimatedSprite2D のフレーム送りを自動で行う。
+    /// GPUParticles2D のパーティクル放出・加齢・除去を自動で行う。
     /// RigidBody2D は PhysicsStep が担当するため no-op。
-    pub def engineProcess(delta: Float64, node: EngineNode[s]): EngineNode[s] = match node {
+    pub def engineProcess(delta: Float64, path: NodePath, scene: Scene[s],
+                          node: EngineNode[s]): EngineNode[s] = match node {
         case EngineNode.AnimSprite2DWithState(sprite, state) =>
             EngineNode.AnimSprite2DWithState(AnimatedSprite2D.advanceFrame(delta, sprite), state)
         case EngineNode.TimerWithState(timer, state) =>
             EngineNode.TimerWithState(Timer.process(delta, timer), state)
+        case EngineNode.GPUParticles2DWithState(emitter, state) =>
+            let globalPos = Scene.globalPositionAt(path, scene);
+            EngineNode.GPUParticles2DWithState(GPUParticles2D.process(delta, globalPos, emitter), state)
         case _ => node
     }
 
@@ -146,6 +156,7 @@ mod EngineNode {
             scale = r#scale,
             rotation = r#rotation,
             color = r#modulate,
+            alpha = 1.0f32,
             centered = r#centered,
             uvOffset = {x = 0.0, y = 0.0},
             uvScale = uvSc,
@@ -161,6 +172,7 @@ mod EngineNode {
             scale = r#scale,
             rotation = r#rotation,
             color = r#modulate,
+            alpha = 1.0f32,
             centered = r#centered,
             uvOffset = {x = 0.0, y = 0.0},
             uvScale = {x = 1.0, y = 1.0},
@@ -175,6 +187,7 @@ mod EngineNode {
             scale = Node2D.getScale(node),
             rotation = Node2D.getRotation(node),
             color = CanvasItem.getModulate(node),
+            alpha = 1.0f32,
             centered = true,
             uvOffset = {x = 0.0, y = 0.0},
             uvScale = {x = 1.0, y = 1.0},
@@ -197,6 +210,7 @@ instance CanvasItem[EngineNode[s]] {
         case EngineNode.ScreenNotifier2DWithState(_, _) => true
         case EngineNode.TimerWithState(timer, _) => CanvasItem.isVisible(timer)
         case EngineNode.ColorRectWithState(rect, _) => CanvasItem.isVisible(rect)
+        case EngineNode.GPUParticles2DWithState(emitter, _) => CanvasItem.isVisible(emitter)
     }
     pub def setVisible(visible: Bool, node: EngineNode[s]): EngineNode[s] = match node {
         case EngineNode.Sprite2DWithState(sprite, st) => EngineNode.Sprite2DWithState(CanvasItem.setVisible(visible, sprite), st)
@@ -210,6 +224,7 @@ instance CanvasItem[EngineNode[s]] {
         case EngineNode.ScreenNotifier2DWithState(_, _) => node
         case EngineNode.TimerWithState(timer, st) => EngineNode.TimerWithState(CanvasItem.setVisible(visible, timer), st)
         case EngineNode.ColorRectWithState(rect, st) => EngineNode.ColorRectWithState(CanvasItem.setVisible(visible, rect), st)
+        case EngineNode.GPUParticles2DWithState(emitter, st) => EngineNode.GPUParticles2DWithState(CanvasItem.setVisible(visible, emitter), st)
     }
     pub def getModulate(node: EngineNode[s]): Color = match node {
         case EngineNode.Sprite2DWithState(sprite, _) => CanvasItem.getModulate(sprite)
@@ -223,6 +238,7 @@ instance CanvasItem[EngineNode[s]] {
         case EngineNode.ScreenNotifier2DWithState(_, _) => {r = 1.0f32, g = 1.0f32, b = 1.0f32}
         case EngineNode.TimerWithState(timer, _) => CanvasItem.getModulate(timer)
         case EngineNode.ColorRectWithState(rect, _) => CanvasItem.getModulate(rect)
+        case EngineNode.GPUParticles2DWithState(emitter, _) => CanvasItem.getModulate(emitter)
     }
     pub def setModulate(color: Color, node: EngineNode[s]): EngineNode[s] = match node {
         case EngineNode.Sprite2DWithState(sprite, st) => EngineNode.Sprite2DWithState(CanvasItem.setModulate(color, sprite), st)
@@ -236,6 +252,7 @@ instance CanvasItem[EngineNode[s]] {
         case EngineNode.ScreenNotifier2DWithState(_, _) => node
         case EngineNode.TimerWithState(timer, st) => EngineNode.TimerWithState(CanvasItem.setModulate(color, timer), st)
         case EngineNode.ColorRectWithState(rect, st) => EngineNode.ColorRectWithState(CanvasItem.setModulate(color, rect), st)
+        case EngineNode.GPUParticles2DWithState(emitter, st) => EngineNode.GPUParticles2DWithState(CanvasItem.setModulate(color, emitter), st)
     }
     pub def getZIndex(node: EngineNode[s]): Int32 = match node {
         case EngineNode.Sprite2DWithState(sprite, _) => CanvasItem.getZIndex(sprite)
@@ -249,6 +266,7 @@ instance CanvasItem[EngineNode[s]] {
         case EngineNode.ScreenNotifier2DWithState(_, _) => 0
         case EngineNode.TimerWithState(timer, _) => CanvasItem.getZIndex(timer)
         case EngineNode.ColorRectWithState(rect, _) => CanvasItem.getZIndex(rect)
+        case EngineNode.GPUParticles2DWithState(emitter, _) => CanvasItem.getZIndex(emitter)
     }
     pub def setZIndex(zIndex: Int32, node: EngineNode[s]): EngineNode[s] = match node {
         case EngineNode.Sprite2DWithState(sprite, st) => EngineNode.Sprite2DWithState(CanvasItem.setZIndex(zIndex, sprite), st)
@@ -262,6 +280,7 @@ instance CanvasItem[EngineNode[s]] {
         case EngineNode.ScreenNotifier2DWithState(_, _) => node
         case EngineNode.TimerWithState(timer, st) => EngineNode.TimerWithState(CanvasItem.setZIndex(zIndex, timer), st)
         case EngineNode.ColorRectWithState(rect, st) => EngineNode.ColorRectWithState(CanvasItem.setZIndex(zIndex, rect), st)
+        case EngineNode.GPUParticles2DWithState(emitter, st) => EngineNode.GPUParticles2DWithState(CanvasItem.setZIndex(zIndex, emitter), st)
     }
 }
 
@@ -280,6 +299,7 @@ instance Node2D[EngineNode[s]] {
         case EngineNode.ScreenNotifier2DWithState(_, _) => Vec2.zero()
         case EngineNode.TimerWithState(timer, _) => Node2D.getPosition(timer)
         case EngineNode.ColorRectWithState(rect, _) => Node2D.getPosition(rect)
+        case EngineNode.GPUParticles2DWithState(emitter, _) => Node2D.getPosition(emitter)
     }
     pub def setPosition(position: Vec2.Vec2, node: EngineNode[s]): EngineNode[s] = match node {
         case EngineNode.Sprite2DWithState(sprite, st) => EngineNode.Sprite2DWithState(Node2D.setPosition(position, sprite), st)
@@ -293,6 +313,7 @@ instance Node2D[EngineNode[s]] {
         case EngineNode.ScreenNotifier2DWithState(_, _) => node
         case EngineNode.TimerWithState(timer, st) => EngineNode.TimerWithState(Node2D.setPosition(position, timer), st)
         case EngineNode.ColorRectWithState(rect, st) => EngineNode.ColorRectWithState(Node2D.setPosition(position, rect), st)
+        case EngineNode.GPUParticles2DWithState(emitter, st) => EngineNode.GPUParticles2DWithState(Node2D.setPosition(position, emitter), st)
     }
     pub def getRotation(node: EngineNode[s]): Float64 = match node {
         case EngineNode.Sprite2DWithState(sprite, _) => Node2D.getRotation(sprite)
@@ -306,6 +327,7 @@ instance Node2D[EngineNode[s]] {
         case EngineNode.ScreenNotifier2DWithState(_, _) => 0.0
         case EngineNode.TimerWithState(timer, _) => Node2D.getRotation(timer)
         case EngineNode.ColorRectWithState(rect, _) => Node2D.getRotation(rect)
+        case EngineNode.GPUParticles2DWithState(emitter, _) => Node2D.getRotation(emitter)
     }
     pub def setRotation(rotation: Float64, node: EngineNode[s]): EngineNode[s] = match node {
         case EngineNode.Sprite2DWithState(sprite, st) => EngineNode.Sprite2DWithState(Node2D.setRotation(rotation, sprite), st)
@@ -319,6 +341,7 @@ instance Node2D[EngineNode[s]] {
         case EngineNode.ScreenNotifier2DWithState(_, _) => node
         case EngineNode.TimerWithState(timer, st) => EngineNode.TimerWithState(Node2D.setRotation(rotation, timer), st)
         case EngineNode.ColorRectWithState(rect, st) => EngineNode.ColorRectWithState(Node2D.setRotation(rotation, rect), st)
+        case EngineNode.GPUParticles2DWithState(emitter, st) => EngineNode.GPUParticles2DWithState(Node2D.setRotation(rotation, emitter), st)
     }
     pub def getScale(node: EngineNode[s]): Vec2.Vec2 = match node {
         case EngineNode.Sprite2DWithState(sprite, _) => Node2D.getScale(sprite)
@@ -332,6 +355,7 @@ instance Node2D[EngineNode[s]] {
         case EngineNode.ScreenNotifier2DWithState(_, _) => {x = 1.0, y = 1.0}
         case EngineNode.TimerWithState(timer, _) => Node2D.getScale(timer)
         case EngineNode.ColorRectWithState(rect, _) => Node2D.getScale(rect)
+        case EngineNode.GPUParticles2DWithState(emitter, _) => Node2D.getScale(emitter)
     }
     pub def setScale(scale: Vec2.Vec2, node: EngineNode[s]): EngineNode[s] = match node {
         case EngineNode.Sprite2DWithState(sprite, st) => EngineNode.Sprite2DWithState(Node2D.setScale(scale, sprite), st)
@@ -345,6 +369,7 @@ instance Node2D[EngineNode[s]] {
         case EngineNode.ScreenNotifier2DWithState(_, _) => node
         case EngineNode.TimerWithState(timer, st) => EngineNode.TimerWithState(Node2D.setScale(scale, timer), st)
         case EngineNode.ColorRectWithState(rect, st) => EngineNode.ColorRectWithState(Node2D.setScale(scale, rect), st)
+        case EngineNode.GPUParticles2DWithState(emitter, st) => EngineNode.GPUParticles2DWithState(Node2D.setScale(scale, emitter), st)
     }
     pub def getSkew(node: EngineNode[s]): Float64 = match node {
         case EngineNode.Sprite2DWithState(sprite, _) => Node2D.getSkew(sprite)
@@ -358,6 +383,7 @@ instance Node2D[EngineNode[s]] {
         case EngineNode.ScreenNotifier2DWithState(_, _) => 0.0
         case EngineNode.TimerWithState(timer, _) => Node2D.getSkew(timer)
         case EngineNode.ColorRectWithState(rect, _) => Node2D.getSkew(rect)
+        case EngineNode.GPUParticles2DWithState(emitter, _) => Node2D.getSkew(emitter)
     }
     pub def setSkew(skew: Float64, node: EngineNode[s]): EngineNode[s] = match node {
         case EngineNode.Sprite2DWithState(sprite, st) => EngineNode.Sprite2DWithState(Node2D.setSkew(skew, sprite), st)
@@ -371,6 +397,7 @@ instance Node2D[EngineNode[s]] {
         case EngineNode.ScreenNotifier2DWithState(_, _) => node
         case EngineNode.TimerWithState(timer, st) => EngineNode.TimerWithState(Node2D.setSkew(skew, timer), st)
         case EngineNode.ColorRectWithState(rect, st) => EngineNode.ColorRectWithState(Node2D.setSkew(skew, rect), st)
+        case EngineNode.GPUParticles2DWithState(emitter, st) => EngineNode.GPUParticles2DWithState(Node2D.setSkew(skew, emitter), st)
     }
 }
 
@@ -416,6 +443,8 @@ instance GameEngine.Renderable[EngineNode[s]] {
                 Label2D.toDrawables(label, globalPos)
             case EngineNode.ColorRectWithState(rect, _) =>
                 ColorRect.toDrawable(rect, globalPos) :: Nil
+            case EngineNode.GPUParticles2DWithState(emitter, _) =>
+                GPUParticles2D.toDrawables(emitter, globalPos)
             case EngineNode.Path2DWithState(_, _) => Nil
             case EngineNode.ScreenNotifier2DWithState(_, _) => Nil
             case EngineNode.TimerWithState(_, _) => Nil
