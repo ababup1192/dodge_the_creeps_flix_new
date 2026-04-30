@@ -35,8 +35,8 @@ def testMobSceneSpawnMobHasSpriteChild(): Unit \ Assert =
     let scene = Scene.empty()
         |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0);
     match Scene.getState("mob_0" :: "sprite" :: Nil, scene) {
-        case Some(GameData.MobSprite) => Assert.assertTrue(true)
-        case _ => bug!("Expected MobSprite child")
+        case Some(GameData.Marker) => Assert.assertTrue(true)
+        case _ => bug!("Expected Marker child")
     }
 
 /// spawnMob で生成された Mob は RigidBody2D である
@@ -55,9 +55,9 @@ def testMobSceneSpawnMobHasNotifierChild(): Unit \ Assert =
     let scene = Scene.empty()
         |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0);
     match Scene.getEngineNode("mob_0" :: "notifier" :: Nil, scene) {
-        case Some(EngineNode.ScreenNotifier2DWithState(_, GameData.MobNotifier)) =>
+        case Some(EngineNode.ScreenNotifier2DWithState(_, GameData.Marker)) =>
             Assert.assertTrue(true)
-        case _ => bug!("Expected ScreenNotifier2DWithState child with MobNotifier")
+        case _ => bug!("Expected ScreenNotifier2DWithState child with Marker")
     }
 
 /// spawnMob で Mob が "mobs" グループに追加される

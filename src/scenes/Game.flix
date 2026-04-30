@@ -12,21 +12,15 @@ pub enum GamePhase with Eq {
 pub enum GameData {
     case Player(PlayerScene.PlayerNode, PlayerScene.PlayerData)
     case PlayerArea
-    case PlayerTrail
     case MobData(Int32)
-    case MobSprite
-    case MobNotifier
     case MobTimer(Int32)
-    case MobPath
-    case Background
     case StartTimer
     case ScoreTimer
     case ScoreLabel(Int32)
-    case MessageLabel
-    case HUDLayer
     case StartButton
     case MessageTimer
     case TitleTimer
+    case Marker
 }
 
 pub type alias GameState = {
@@ -77,9 +71,9 @@ instance AreaHandler[GameData] {
                           scene: Scene[GameData]): Scene[GameData] =
         match (selfState, otherState) {
             case (GameData.PlayerArea, GameData.MobData(_)) =>
-                scene
-                    |> PlayerScene.mapSprite(CanvasItem.hide)
-                    |> PlayerScene.setAreaMonitoring(false)
+                scene |> PlayerScene.mapPlayer((playerNode, playerData) ->
+                    ({ sprite = CanvasItem.hide(playerNode#sprite),
+                       area = Area2D.setMonitoring(false, playerNode#area) }, playerData))
             case _ => scene
         }
 }
@@ -167,7 +161,7 @@ mod Game {
         );
         let bgNode = EngineNode.ColorRectWithState(
             CanvasItem.setZIndex(-100, bg),
-            GameData.Background
+            GameData.Marker
         );
         {   scene = Scene.empty()
                 |> Scene.addNode("background", bgNode)
@@ -175,7 +169,7 @@ mod Game {
                 |> Scene.addNode("mob_timer",
                     EngineNode.TimerWithState(mobTimer, GameData.MobTimer(0)))
                 |> Scene.addNode("mob_path",
-                    EngineNode.Path2DWithState(mobPath, GameData.MobPath))
+                    EngineNode.Path2DWithState(mobPath, GameData.Marker))
                 |> Scene.addNode("start_timer",
                     EngineNode.TimerWithState(startTimer, GameData.StartTimer))
                 |> Scene.addNode("score_timer",
@@ -210,12 +204,11 @@ mod Game {
     /// Menu/GameOver → GetReady: プレイヤー表示、スコアリセット、GetReady メッセージ、BGM 再生
     pub def newGame(state: GameState): GameState \ GameEngine.Audio =
         AudioStreamPlayer.play("music");
-        let s0 = state#scene
+        let scene = state#scene
             |> Scene.removeGroup(MobScene.mobGroup())
-            |> PlayerScene.start({x = 240.0, y = 450.0});
-        let pd = PlayerScene.extractPlayerData(s0);
-        let scene = s0
-            |> PlayerScene.setPlayerData({velocity = Vec2.zero() | pd})
+            |> PlayerScene.start({x = 240.0, y = 450.0})
+            |> PlayerScene.mapPlayer((playerNode, playerData) ->
+                (playerNode, {velocity = Vec2.zero() | playerData}))
             |> HUDScene.showMessage("Get Ready")
             |> HUDScene.updateScore(0)
             |> HUDScene.hideStartButton

@@ -73,7 +73,7 @@ mod PlayerScene {
                         startAlpha = 0.5f32, endAlpha = 0.0f32,
                         startScale = 0.5, endScale = 0.324
                     }) |> CanvasItem.setZIndex(-1),
-                    GameData.PlayerTrail))
+                    GameData.Marker))
             |> mapSprite(CanvasItem.hide)
 
     // ========================================================================
@@ -106,18 +106,9 @@ mod PlayerScene {
     /// Godot の start(pos) を再現: 位置設定 + 回転リセット + show + 衝突再有効化
     /// trail は visible 伝播により親（player）の表示に自動追従する
     pub def start(pos: Vec2.Vec2, scene: Scene[GameData]): Scene[GameData] =
-        scene
-            |> mapSprite(sprite ->
-                sprite
-                    |> position(pos)
-                    |> rotation(0.0)
-                    |> show)
-            |> setAreaMonitoring(true)
-
-    /// プレイヤーの Area2D の monitoring を設定する（衝突の有効/無効化）
-    pub def setAreaMonitoring(enabled: Bool, scene: Scene[GameData]): Scene[GameData] =
-        scene |> Scene.mapEngineNode(name() :: areaName() :: Nil,
-            EngineNode.mapArea2D(Area2D.setMonitoring(enabled)))
+        scene |> mapPlayer((playerNode, playerData) ->
+            ({ sprite = playerNode#sprite |> position(pos) |> rotation(0.0) |> show,
+               area = Area2D.setMonitoring(true, playerNode#area) }, playerData))
 
     // ========================================================================
     // 入力適用
@@ -129,10 +120,9 @@ mod PlayerScene {
                 Vec2.mul(Vec2.normalized(dir), speed())
             else
                 Vec2.zero();
-        let playerData = extractPlayerData(scene);
-        scene
-            |> setPlayerData({velocity = velocity | playerData})
-            |> mapSprite(setPlayerAnimation(dir))
+        scene |> mapPlayer((playerNode, playerData) ->
+            ({ sprite = setPlayerAnimation(dir, playerNode#sprite) | playerNode },
+             { velocity = velocity | playerData }))
 
     // ========================================================================
     // アニメーション制御
@@ -167,28 +157,13 @@ mod PlayerScene {
                 case other => other
             })
 
-    /// playerNode の area を Scene の子ノードに書き戻す（シリアライザ）
-    pub def syncChildren(playerNode: PlayerNode, scene: Scene[GameData]): Scene[GameData] =
+    /// PlayerNode の area を Scene の子ノードに書き戻す
+    def syncChildren(playerNode: PlayerNode, scene: Scene[GameData]): Scene[GameData] =
         scene |> Scene.mapEngineNode(name() :: areaName() :: Nil,
             EngineNode.mapArea2D(_ -> playerNode#area))
 
-    /// Scene から PlayerData を取り出す
-    pub def extractPlayerData(scene: Scene[GameData]): PlayerData =
-        match Scene.getState(name() :: Nil, scene) {
-            case Some(GameData.Player(_, playerData)) => playerData
-            case _ => bug!("player data not found")
-        }
-
-    /// PlayerData を Scene に書き戻す
-    pub def setPlayerData(playerData: PlayerData, scene: Scene[GameData]): Scene[GameData] =
-        scene |> Scene.mapState(name() :: Nil, state ->
-            match state {
-                case GameData.Player(playerNode, _) => GameData.Player(playerNode, playerData)
-                case other => other
-            })
-
-    /// Scene から PlayerNode を構築する（デシリアライザ）
-    pub def extractPlayerNode(scene: Scene[GameData]): PlayerNode =
+    /// Scene から PlayerNode を構築する
+    def extractPlayerNode(scene: Scene[GameData]): PlayerNode =
         let sprite = match Scene.getEngineNode(name() :: Nil, scene) {
             case Some(EngineNode.AnimSprite2DWithState(s, _)) => s
             case _ => bug!("player sprite not found")
@@ -198,5 +173,28 @@ mod PlayerScene {
             case _ => bug!("player area not found")
         };
         { sprite = sprite, area = area }
+
+    /// PlayerNode と PlayerData を一括で変換する（sprite・area・データを同時に更新）
+    pub def mapPlayer(f: (PlayerNode, PlayerData) -> (PlayerNode, PlayerData),
+                      scene: Scene[GameData]): Scene[GameData] =
+        let playerNode = extractPlayerNode(scene);
+        let playerData = extractPlayerData(scene);
+        let (newNode, newData) = f(playerNode, playerData);
+        scene
+            |> Scene.mapEngineNode(name() :: Nil, en ->
+                match en {
+                    case EngineNode.AnimSprite2DWithState(_, GameData.Player(_, _)) =>
+                        EngineNode.AnimSprite2DWithState(newNode#sprite,
+                            GameData.Player(newNode, newData))
+                    case other => other
+                })
+            |> syncChildren(newNode)
+
+    /// Scene から PlayerData を取り出す
+    def extractPlayerData(scene: Scene[GameData]): PlayerData =
+        match Scene.getState(name() :: Nil, scene) {
+            case Some(GameData.Player(_, playerData)) => playerData
+            case _ => bug!("player data not found")
+        }
 
 }

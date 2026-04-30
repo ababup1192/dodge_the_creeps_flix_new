@@ -95,9 +95,9 @@ mod MobScene {
                 EngineNode.RigidBody2DWithState(body, GameData.MobData(counter)))
             |> Scene.addToGroup(name :: Nil, mobGroup())
             |> Scene.addChild(name, spriteName(),
-                EngineNode.AnimSprite2DWithState(sprite, GameData.MobSprite))
+                EngineNode.AnimSprite2DWithState(sprite, GameData.Marker))
             |> Scene.addChild(name, notifierName(),
-                EngineNode.ScreenNotifier2DWithState(notifier, GameData.MobNotifier))
+                EngineNode.ScreenNotifier2DWithState(notifier, GameData.Marker))
 
     // ========================================================================
     // ready: アニメーション選択 + linearVelocity 設定（Godot _ready 準拠）

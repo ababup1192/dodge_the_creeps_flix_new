@@ -481,11 +481,11 @@ def testDetectOverlapsPlayerMob(): Unit \ Assert =
 // Start ボタン: 座標・サイズ・配置
 // ========================================================================
 
-/// HUD CanvasLayer が存在し、状態が HUDLayer であること
+/// HUD CanvasLayer が存在し、状態が Marker であること
 @Test
 def testHUDCanvasLayerExists(): Unit \ Assert =
     match Scene.getState(HUDScene.hudName() :: Nil, testScene()) {
-        case Some(GameData.HUDLayer) => Assert.assertTrue(true)
+        case Some(GameData.Marker) => Assert.assertTrue(true)
         case _ => bug!("hud not found or wrong state")
     }
 

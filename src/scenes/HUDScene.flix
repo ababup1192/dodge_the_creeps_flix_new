@@ -48,11 +48,11 @@ mod HUDScene {
         let titleTimer = Timer.make(1.0);
         scene
             |> Scene.addNode(hudName(),
-                EngineNode.CanvasLayerWithState(hud, GameData.HUDLayer))
+                EngineNode.CanvasLayerWithState(hud, GameData.Marker))
             |> Scene.addChild(hudName(), scoreLabelName(),
                 EngineNode.Label2DWithState(scoreLabel, GameData.ScoreLabel(0)))
             |> Scene.addChild(hudName(), messageLabelName(),
-                EngineNode.Label2DWithState(messageLabel, GameData.MessageLabel))
+                EngineNode.Label2DWithState(messageLabel, GameData.Marker))
             |> Scene.addChild(hudName(), startButtonName(),
                 EngineNode.ButtonWithState(startButton, GameData.StartButton))
             |> Scene.addChild(hudName(), messageTimerName(),
