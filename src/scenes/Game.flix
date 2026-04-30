@@ -118,11 +118,10 @@ mod Game {
         else {
             let dt = GameEngine.Game.getDeltaTime();
             let dir = readInputDirection();
-            let gravity = PhysicsStep.defaultGravity();
             let updateScene =
                 PlayerScene.applyInput(dir)
                 >> GameEngine.process(dt, false)
-                >> GameEngine.physics(dt, false, gravity)
+                >> GameEngine.physics(dt, false,  PhysicsStep.defaultGravity())
                 >> GameEngine.collisions
                 >> GameEngine.offscreen(screenWidth = screenWi(), screenHeight = screenHi());
             let updatedScene = updateScene(state#scene);
