@@ -84,10 +84,9 @@ mod Game {
 
     pub def start(fontAtlas: FontAtlas): Unit \ Engine.Game =
         let state = buildState(fontAtlas);
-        let readyState: GameState = { scene = Scene.readyAll(state#scene) | state };
         let startedState: GameState = {
-            scene = PlayerScene.start({x = 240.0, y = 360.0}, readyState#scene)
-            | readyState };
+            scene = PlayerScene.start({x = 240.0, y = 360.0}, state#scene)
+            | state };
         gameLoop(fontAtlas, startedState)
 
     def gameLoop(fontAtlas: FontAtlas, state: GameState): Unit \ Engine.Game =

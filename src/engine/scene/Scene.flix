@@ -13,7 +13,8 @@ pub enum SceneEntry[s] {
 pub enum Scene[s] {
     case Scene({
         nodes = Map[NodeName, SceneEntry[s]],
-        prevOverlaps = OverlapPairSet
+        prevOverlaps = OverlapPairSet,
+        readied = Bool
     })
 }
 
@@ -122,7 +123,7 @@ pub mod Scene {
 
     /// 空のシーンを返す
     pub def empty(): Scene[s] =
-        Scene.Scene({ nodes = Map.empty(), prevOverlaps = Set.empty() })
+        Scene.Scene({ nodes = Map.empty(), prevOverlaps = Set.empty(), readied = false })
 
     /// ルートノードとして追加する（state は EngineNode[s] 内に含まれる）
     pub def addNode(name: NodeName, engineNode: EngineNode[s], scene: Scene[s]): Scene[s] =
@@ -347,22 +348,26 @@ pub mod Scene {
             Ref.get(sceneRef)
         }
 
-    /// 全ノードの ready を preorder で一度だけ呼び出す
+    /// 全ノードの ready を preorder で一度だけ呼び出し、readied フラグを設定する
     pub def readyAll(scene: Scene[s]): Scene[s] \ Engine.Game with Node[s] =
+        let Scene.Scene(r) = scene;
         foldNodes((engineNode, path, sc) ->
             Node.ready(engineNode, path, sc),
-            scene)
+            Scene.Scene({ readied = true | r }))
 
     /// 全ノードの process を preorder（親→子）の順で呼び出す
     /// EngineNode.engineProcess（AnimSprite2D のフレーム送り等）も自動実行される
-    pub def processAll(delta: Float64, paused: Bool, scene: Scene[s]): Scene[s] with Node[s] =
+    /// 初回呼び出し時に readyAll を自動実行する
+    pub def processAll(delta: Float64, paused: Bool, scene: Scene[s]): Scene[s] \ Engine.Game with Node[s] =
+        let Scene.Scene(r) = scene;
+        let readiedScene = if (not r#readied) readyAll(scene) else scene;
         foldNodes((engineNode, path, sc) ->
             if (ProcessMode.shouldProcess(paused, Node.getProcessMode(EngineNode.getState(engineNode)))) {
                 let newEn = EngineNode.engineProcess(delta, engineNode);
                 Node.process(delta, newEn, path, sc)
             } else
                 (engineNode, sc),
-            scene)
+            readiedScene)
 
     // ========================================================================
     // 描画（制約なし — EngineNode の Renderable を直接使用）

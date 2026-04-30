@@ -220,13 +220,13 @@ def testProcessAndEmitFiresEvents(): Unit \ Assert =
     let scene: Scene[Unit] = Scene.empty()
         |> Scene.addNode("a", rectAreaNode(0.0, 0.0, 10.0, 10.0))
         |> Scene.addNode("b", rectAreaNode(5.0, 0.0, 10.0, 10.0));
-    let count = run {
+    let count = withMockEngine(() -> run {
         let _s = AreaEvent.processAndEmit(0.016, false, scene);
         0
     } with handler OnAreaEvent {
         def areaEntered(_selfPath, _selfPos, _other, k) =
             k(()) + 1
-    };
+    });
     Assert.assertEq(expected = 2, count)
 
 /// 重なりがなければ processAndEmit でもイベント発火なし
@@ -235,13 +235,13 @@ def testProcessAndEmitNoEvents(): Unit \ Assert =
     let scene: Scene[Unit] = Scene.empty()
         |> Scene.addNode("a", rectAreaNode(0.0, 0.0, 4.0, 4.0))
         |> Scene.addNode("b", rectAreaNode(100.0, 0.0, 4.0, 4.0));
-    let count = run {
+    let count = withMockEngine(() -> run {
         let _s = AreaEvent.processAndEmit(0.016, false, scene);
         0
     } with handler OnAreaEvent {
         def areaEntered(_selfPath, _selfPos, _other, k) =
             k(()) + 1
-    };
+    });
     Assert.assertEq(expected = 0, count)
 
 /// ハンドラで戻り値を変換するパターン（旧エンジン stepAndCollide 相当）
@@ -250,13 +250,13 @@ def testProcessAndEmitHandlerTransform(): Unit \ Assert =
     let scene: Scene[Unit] = Scene.empty()
         |> Scene.addNode("player", rectAreaNode(0.0, 0.0, 10.0, 10.0))
         |> Scene.addNode("enemy", rectAreaNode(5.0, 0.0, 10.0, 10.0));
-    let hitPaths: List[NodePath] = run {
+    let hitPaths: List[NodePath] = withMockEngine(() -> run {
         let _s = AreaEvent.processAndEmit(0.016, false, scene);
         Nil
     } with handler OnAreaEvent {
         def areaEntered(selfPath, _selfPos, _other, k) =
             selfPath :: k(())
-    };
+    });
     Assert.assertEq(expected = 2, List.length(hitPaths))
 
 // ========================================================================
@@ -269,7 +269,7 @@ def testProcessAndEmitHandledChangesModulate(): Unit \ Assert =
     let scene: Scene[TestAreaState] = Scene.empty()
         |> Scene.addNode("red", testStateAreaNode(0.0, 0.0, 10.0, 10.0, TestAreaState.RedState))
         |> Scene.addNode("blue", testStateAreaNode(5.0, 0.0, 10.0, 10.0, TestAreaState.BlueState));
-    let result = AreaEvent.processAndEmitHandled(0.016, false, scene);
+    let result = withMockEngine(() -> AreaEvent.processAndEmitHandled(0.016, false, scene));
     match Scene.getEngineNode("red" :: Nil, result) {
         case Some(engineNode) =>
             let c = CanvasItem.getModulate(engineNode);
@@ -283,7 +283,7 @@ def testProcessAndEmitHandledBlueUnchanged(): Unit \ Assert =
     let scene: Scene[TestAreaState] = Scene.empty()
         |> Scene.addNode("red", testStateAreaNode(0.0, 0.0, 10.0, 10.0, TestAreaState.RedState))
         |> Scene.addNode("blue", testStateAreaNode(5.0, 0.0, 10.0, 10.0, TestAreaState.BlueState));
-    let result = AreaEvent.processAndEmitHandled(0.016, false, scene);
+    let result = withMockEngine(() -> AreaEvent.processAndEmitHandled(0.016, false, scene));
     match Scene.getEngineNode("blue" :: Nil, result) {
         case Some(engineNode) =>
             let c = CanvasItem.getModulate(engineNode);
@@ -297,7 +297,7 @@ def testProcessAndEmitHandledNoOverlap(): Unit \ Assert =
     let scene: Scene[TestAreaState] = Scene.empty()
         |> Scene.addNode("red", testStateAreaNode(0.0, 0.0, 4.0, 4.0, TestAreaState.RedState))
         |> Scene.addNode("blue", testStateAreaNode(100.0, 0.0, 4.0, 4.0, TestAreaState.BlueState));
-    let result = AreaEvent.processAndEmitHandled(0.016, false, scene);
+    let result = withMockEngine(() -> AreaEvent.processAndEmitHandled(0.016, false, scene));
     match Scene.getEngineNode("red" :: Nil, result) {
         case Some(engineNode) =>
             let c = CanvasItem.getModulate(engineNode);
@@ -311,7 +311,7 @@ def testProcessAndEmitHandledSameVariant(): Unit \ Assert =
     let scene: Scene[TestAreaState] = Scene.empty()
         |> Scene.addNode("r1", testStateAreaNode(0.0, 0.0, 10.0, 10.0, TestAreaState.RedState))
         |> Scene.addNode("r2", testStateAreaNode(5.0, 0.0, 10.0, 10.0, TestAreaState.RedState));
-    let result = AreaEvent.processAndEmitHandled(0.016, false, scene);
+    let result = withMockEngine(() -> AreaEvent.processAndEmitHandled(0.016, false, scene));
     match Scene.getEngineNode("r1" :: Nil, result) {
         case Some(engineNode) =>
             let c = CanvasItem.getModulate(engineNode);
@@ -333,13 +333,13 @@ def testProcessAndEmitHandledFiresExitOnSeparation(): Unit \ Assert =
     let scene: Scene[TestAreaState] = Scene.empty()
         |> Scene.addNode("red", testStateAreaNode(0.0, 0.0, 10.0, 10.0, TestAreaState.RedState))
         |> Scene.addNode("blue", testStateAreaNode(5.0, 0.0, 10.0, 10.0, TestAreaState.BlueState));
-    let sceneAfterEnter = AreaEvent.processAndEmitHandled(0.016, false, scene);
+    let sceneAfterEnter = withMockEngine(() -> AreaEvent.processAndEmitHandled(0.016, false, scene));
     // フレーム2: 離す → 前フレームの prevOverlaps は Scene 内に保持されている
     let separatedScene: Scene[TestAreaState] = Scene.empty()
         |> Scene.addNode("red", testStateAreaNode(0.0, 0.0, 4.0, 4.0, TestAreaState.RedState))
         |> Scene.addNode("blue", testStateAreaNode(100.0, 0.0, 4.0, 4.0, TestAreaState.BlueState))
         |> Scene.setPrevOverlaps(Scene.getPrevOverlaps(sceneAfterEnter));
-    let result = AreaEvent.processAndEmitHandled(0.016, false, separatedScene);
+    let result = withMockEngine(() -> AreaEvent.processAndEmitHandled(0.016, false, separatedScene));
     // 離脱後のペアセットは空
     Assert.assertEq(expected = 0, Set.size(Scene.getPrevOverlaps(result)));
     // RedState の modulate が白に戻っている（onAreaExited で戻した）
@@ -356,7 +356,7 @@ def testProcessAndEmitHandledNoExitWithEmptyPrev(): Unit \ Assert =
     let scene: Scene[TestAreaState] = Scene.empty()
         |> Scene.addNode("red", testStateAreaNode(0.0, 0.0, 4.0, 4.0, TestAreaState.RedState))
         |> Scene.addNode("blue", testStateAreaNode(100.0, 0.0, 4.0, 4.0, TestAreaState.BlueState));
-    let result = AreaEvent.processAndEmitHandled(0.016, false, scene);
+    let result = withMockEngine(() -> AreaEvent.processAndEmitHandled(0.016, false, scene));
     Assert.assertEq(expected = 0, Set.size(Scene.getPrevOverlaps(result)));
     match Scene.getEngineNode("red" :: Nil, result) {
         case Some(engineNode) =>

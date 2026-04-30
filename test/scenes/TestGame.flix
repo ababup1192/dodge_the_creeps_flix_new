@@ -106,7 +106,7 @@ def testPlayerInitialVelocity(): Unit \ Assert =
 /// fps=6 で 0.2 秒後（frameDuration=1/6≒0.167 超過）にフレームが進む
 @Test
 def testAnimSpriteAdvancesFrame(): Unit \ Assert =
-    match testScene() |> Scene.processAll(0.2, false) |> Scene.getEngineNode("player" :: Nil) {
+    match withMockEngine(() -> testScene() |> Scene.processAll(0.2, false)) |> Scene.getEngineNode("player" :: Nil) {
         case Some(EngineNode.AnimSprite2DWithState(sprite, _)) =>
             Assert.assertEq(expected = "playerGrey_walk2", AnimatedSprite2D.currentTexture(sprite))
         case _ => bug!("player not found after process")
@@ -115,7 +115,7 @@ def testAnimSpriteAdvancesFrame(): Unit \ Assert =
 /// 2 回の processAll でフレームが一周し、最初のフレームに戻る（ループ）
 @Test
 def testAnimSpriteLoops(): Unit \ Assert =
-    match testScene() |> Scene.processAll(0.2, false) |> Scene.processAll(0.2, false) |> Scene.getEngineNode("player" :: Nil) {
+    match withMockEngine(() -> testScene() |> Scene.processAll(0.2, false) |> Scene.processAll(0.2, false)) |> Scene.getEngineNode("player" :: Nil) {
         case Some(EngineNode.AnimSprite2DWithState(sprite, _)) =>
             Assert.assertEq(expected = "playerGrey_walk1", AnimatedSprite2D.currentTexture(sprite))
         case _ => bug!("player not found after process")
@@ -272,13 +272,13 @@ def testPlayerProcessMoves(): Unit \ Assert =
                     GameData.Player(pn, {velocity = {x = 400.0, y = 0.0} | pd})
                 case other => other
             });
-    let pos = scene |> Scene.processAll(0.1, false) |> Scene.globalPosition("player");
+    let pos = withMockEngine(() -> scene |> Scene.processAll(0.1, false)) |> Scene.globalPosition("player");
     Assert.assertEq(expected = (280.0, 360.0), vecToTuple(pos))
 
 /// 速度ゼロのとき process で移動しない
 @Test
 def testPlayerProcessStays(): Unit \ Assert =
-    let pos = testReadyScene() |> Scene.processAll(0.1, false) |> Scene.globalPosition("player");
+    let pos = withMockEngine(() -> testReadyScene() |> Scene.processAll(0.1, false)) |> Scene.globalPosition("player");
     Assert.assertEq(expected = (240.0, 360.0), vecToTuple(pos))
 
 /// 画面右端でクランプされる
@@ -291,7 +291,7 @@ def testPlayerClampRight(): Unit \ Assert =
                     GameData.Player(pn, {velocity = {x = 400.0, y = 0.0} | pd})
                 case other => other
             });
-    let pos = scene |> Scene.processAll(1.0, false) |> Scene.globalPosition("player");
+    let pos = withMockEngine(() -> scene |> Scene.processAll(1.0, false)) |> Scene.globalPosition("player");
     Assert.assertEq(expected = (480.0, 360.0), vecToTuple(pos))
 
 /// 画面左端でクランプされる
@@ -304,7 +304,7 @@ def testPlayerClampLeft(): Unit \ Assert =
                     GameData.Player(pn, {velocity = {x = -400.0, y = 0.0} | pd})
                 case other => other
             });
-    let pos = scene |> Scene.processAll(1.0, false) |> Scene.globalPosition("player");
+    let pos = withMockEngine(() -> scene |> Scene.processAll(1.0, false)) |> Scene.globalPosition("player");
     Assert.assertEq(expected = (0.0, 360.0), vecToTuple(pos))
 
 // ========================================================================
@@ -314,8 +314,7 @@ def testPlayerClampLeft(): Unit \ Assert =
 /// 同じアニメーションの場合フレームがリセットされない
 @Test
 def testSwitchAnimKeepsFrame(): Unit \ Assert =
-    let scene = testScene()
-        |> Scene.processAll(0.2, false)
+    let scene = withMockEngine(() -> testScene() |> Scene.processAll(0.2, false))
         |> PlayerScene.applyInput({x = 1.0, y = 0.0});
     match Scene.getEngineNode("player" :: Nil, scene) {
         case Some(EngineNode.AnimSprite2DWithState(sprite, _)) =>
@@ -326,8 +325,7 @@ def testSwitchAnimKeepsFrame(): Unit \ Assert =
 /// アニメーションが変わるとフレームがリセットされる
 @Test
 def testSwitchAnimResetsFrame(): Unit \ Assert =
-    let scene = testScene()
-        |> Scene.processAll(0.2, false)
+    let scene = withMockEngine(() -> testScene() |> Scene.processAll(0.2, false))
         |> PlayerScene.applyInput({x = 0.0, y = -1.0});
     match Scene.getEngineNode("player" :: Nil, scene) {
         case Some(EngineNode.AnimSprite2DWithState(sprite, _)) =>
