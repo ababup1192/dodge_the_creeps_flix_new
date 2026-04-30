@@ -16,16 +16,22 @@ instance Node[GameData] {
     redef ready(node: EngineNode[GameData],
                 _path: NodePath, scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) \ Engine.Game =
         match node {
-            case EngineNode.AnimSprite2DWithState(sprite, GameData.Player(pn, pd)) =>
-                PlayerScene.ready(sprite, pn, pd, scene)
-            case _ => checked_ecast((node, scene))
+            case EngineNode.AnimSprite2DWithState(sprite, GameData.Player(playerNode, playerData)) =>
+                let (readySprite, readyPlayerData) = PlayerScene.ready(sprite, playerData);
+                (EngineNode.AnimSprite2DWithState(readySprite,
+                    GameData.Player({ sprite = readySprite | playerNode }, readyPlayerData)), scene
+                )
+            case _ => (node, scene)
         }
 
     redef process(delta: Float64, node: EngineNode[GameData],
                     _path: NodePath, scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) =
         match node {
-            case EngineNode.AnimSprite2DWithState(sprite, GameData.Player(pn, pd)) =>
-                PlayerScene.process(delta, sprite, pn, pd, scene)
+            case EngineNode.AnimSprite2DWithState(sprite, GameData.Player(playerNode, playerData)) =>
+                let movedSprite = PlayerScene.process(delta, sprite, playerData);
+                (EngineNode.AnimSprite2DWithState(movedSprite,
+                    GameData.Player({ sprite = movedSprite | playerNode }, playerData))
+                , scene)
             case _ => (node, scene)
         }
 }

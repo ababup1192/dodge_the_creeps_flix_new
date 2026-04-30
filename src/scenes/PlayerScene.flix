@@ -1,6 +1,7 @@
 // PlayerScene — Dodge the Creeps プレイヤーのシーン構築・移動・アニメーション
 
 mod PlayerScene {
+    use Node2D.setPosition
     use NodeBuilder.{position, rotation, show, hide}
 
     pub type alias PlayerData = {velocity = Vec2.Vec2, screenSize = Vec2.Vec2}
@@ -53,11 +54,11 @@ mod PlayerScene {
             startPosition(),
             {x = 1.0, y = 1.0});
         let area = Area2D.make(Vec2.zero(), playerCollisionShape());
-        let pn: PlayerNode = { sprite = sprite, area = area };
+        let playerNode: PlayerNode = { sprite = sprite, area = area };
         scene
             |> Scene.addNode(name(),
                 EngineNode.AnimSprite2DWithState(sprite,
-                    GameData.Player(pn, {velocity = Vec2.zero(), screenSize = Vec2.zero()})))
+                    GameData.Player(playerNode, {velocity = Vec2.zero(), screenSize = Vec2.zero()})))
             |> Scene.addChild(name(), areaName(),
                 EngineNode.Area2DWithState(area, GameData.PlayerArea))
 
@@ -65,45 +66,23 @@ mod PlayerScene {
     // ready: ビューポートサイズ取得
     // ========================================================================
 
-    /// プレイヤーの ready 処理: ビューポートサイズを取得して PlayerData に保存する
-    pub def ready(sprite: AnimatedSprite2D, pn: PlayerNode, pd: PlayerData,
-                  scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) \ Engine.Game =
-        let viewportSize = Engine.Game.getViewportRect()#size;
-        let hiddenSprite = hide(sprite);
-        let pn1 = { sprite = hiddenSprite | pn };
-        (EngineNode.AnimSprite2DWithState(
-            hiddenSprite,
-            GameData.Player(pn1, {screenSize = viewportSize | pd})),
-            scene
-        )
+    /// プレイヤーの ready 処理: ビューポートサイズを取得し、非表示にした sprite と更新済み PlayerData を返す
+    pub def ready(sprite: AnimatedSprite2D, playerData: PlayerData): (AnimatedSprite2D, PlayerData) \ Engine.Game =
+        (hide(sprite), {screenSize = Engine.Game.getViewportRect()#size | playerData})
 
     // ========================================================================
     // 毎フレーム処理（Node.process から委譲される）
     // ========================================================================
 
-    /// プレイヤーノードの毎フレーム処理
+    /// プレイヤーノードの毎フレーム処理: 速度に応じて移動しクランプした sprite を返す
     pub def process(dt: Float64, sprite: AnimatedSprite2D,
-                    playerNode: PlayerNode, playerData: PlayerData,
-                    scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) =
-        let movedSprite = movePlayer(dt, playerData#screenSize, sprite, {velocity = playerData#velocity});
-        let node = EngineNode.AnimSprite2DWithState(movedSprite, GameData.Player({ sprite = movedSprite | playerNode }, playerData));
-        (node, scene)
-
-    // ========================================================================
-    // 移動
-    // ========================================================================
-
-    /// 速度に応じてプレイヤーを移動し、画面範囲にクランプする
-    pub def movePlayer(dt: Float64, screenSize: Vec2.Vec2,
-                       sprite: AnimatedSprite2D,
-                       r: {velocity = Vec2.Vec2}): AnimatedSprite2D =
-        let pos = Node2D.getPosition(sprite);
-        let newPos = Vec2.clamp(
-            Vec2.add(pos, Vec2.mul(r#velocity, dt)),
+                    playerData: PlayerData): AnimatedSprite2D =
+        let newPosition = Vec2.clamp(
+            Vec2.add(Node2D.getPosition(sprite), Vec2.mul(playerData#velocity, dt)),
             Vec2.zero(),
-            screenSize
+            playerData#screenSize
         );
-        position(newPos, sprite)
+        setPosition(newPosition, sprite)
 
     // ========================================================================
     // ゲーム開始: 位置リセット + 表示
@@ -127,9 +106,9 @@ mod PlayerScene {
                 Vec2.mul(Vec2.normalized(dir), speed())
             else
                 Vec2.zero();
-        let pd = extractPlayerData(scene);
+        let playerData = extractPlayerData(scene);
         scene
-            |> setPlayerData({velocity = velocity | pd})
+            |> setPlayerData({velocity = velocity | playerData})
             |> mapSprite(setPlayerAnimation(dir))
 
     // ========================================================================
@@ -154,34 +133,34 @@ mod PlayerScene {
     // PlayerNode ヘルパー
     // ========================================================================
 
-    /// プレイヤーの sprite を変換する（EngineNode と pn#sprite を同時更新）
+    /// プレイヤーの sprite を変換する（EngineNode と playerNode#sprite を同時更新）
     pub def mapSprite(f: AnimatedSprite2D -> AnimatedSprite2D,
                       scene: Scene[GameData]): Scene[GameData] =
         scene |> Scene.mapEngineNode(name() :: Nil, en ->
             match en {
-                case EngineNode.AnimSprite2DWithState(sprite, GameData.Player(pn, pd)) =>
+                case EngineNode.AnimSprite2DWithState(sprite, GameData.Player(playerNode, playerData)) =>
                     let newSprite = f(sprite);
-                    EngineNode.AnimSprite2DWithState(newSprite, GameData.Player({sprite = newSprite | pn}, pd))
+                    EngineNode.AnimSprite2DWithState(newSprite, GameData.Player({sprite = newSprite | playerNode}, playerData))
                 case other => other
             })
 
-    /// pn の area を Scene の子ノードに書き戻す（シリアライザ）
-    pub def syncChildren(pn: PlayerNode, scene: Scene[GameData]): Scene[GameData] =
+    /// playerNode の area を Scene の子ノードに書き戻す（シリアライザ）
+    pub def syncChildren(playerNode: PlayerNode, scene: Scene[GameData]): Scene[GameData] =
         scene |> Scene.mapEngineNode(name() :: areaName() :: Nil,
-            EngineNode.mapArea2D(_ -> pn#area))
+            EngineNode.mapArea2D(_ -> playerNode#area))
 
     /// Scene から PlayerData を取り出す
     pub def extractPlayerData(scene: Scene[GameData]): PlayerData =
         match Scene.getState(name() :: Nil, scene) {
-            case Some(GameData.Player(_, pd)) => pd
+            case Some(GameData.Player(_, playerData)) => playerData
             case _ => bug!("player data not found")
         }
 
     /// PlayerData を Scene に書き戻す
-    pub def setPlayerData(pd: PlayerData, scene: Scene[GameData]): Scene[GameData] =
+    pub def setPlayerData(playerData: PlayerData, scene: Scene[GameData]): Scene[GameData] =
         scene |> Scene.mapState(name() :: Nil, state ->
             match state {
-                case GameData.Player(pn, _) => GameData.Player(pn, pd)
+                case GameData.Player(playerNode, _) => GameData.Player(playerNode, playerData)
                 case other => other
             })
 
