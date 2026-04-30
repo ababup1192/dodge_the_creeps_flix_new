@@ -21,8 +21,11 @@ mod PlayerScene {
     /// プレイヤーノードのパス
     def playerPath(): NodePath = name() :: Nil
 
+    /// Area2D 子ノード名
+    def areaName(): String = "area"
+
     /// Area2D 子ノードのパス
-    def areaPath(): NodePath = name() :: "area" :: Nil
+    def areaPath(): NodePath = name() :: areaName() :: Nil
 
     /// プレイヤー初期位置（Godot 版準拠）
     def startPosition(): Vec2.Vec2 = {x = 240.0, y = 450.0}
@@ -66,7 +69,7 @@ mod PlayerScene {
             |> Scene.addNode(name(),
                 EngineNode.AnimSprite2DWithState(sprite,
                     GameData.Player(playerNode, {velocity = Vec2.zero(), screenSize = Vec2.zero(), hit = false})))
-            |> Scene.addChild(name(), "area",
+            |> Scene.addChild(name(), areaName(),
                 EngineNode.Area2DWithState(area, GameData.PlayerArea))
             |> Scene.addChild(name(), "trail",
                 EngineNode.GPUParticles2DWithState(
