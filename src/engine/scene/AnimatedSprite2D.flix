@@ -133,6 +133,11 @@ mod AnimatedSprite2D {
     pub def setFlipV(v: Bool, sprite: AnimatedSprite2D): AnimatedSprite2D =
         let AnimatedSprite2D.AnimatedSprite2D(r) = sprite;
         AnimatedSprite2D.AnimatedSprite2D({flipV = v | r})
+
+    /// フレームレートを設定する
+    pub def setFps(fps: Float64, sprite: AnimatedSprite2D): AnimatedSprite2D =
+        let AnimatedSprite2D.AnimatedSprite2D(r) = sprite;
+        AnimatedSprite2D.AnimatedSprite2D({fps = fps | r})
 }
 
 // ── CanvasItem 実装 ──

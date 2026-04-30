@@ -55,7 +55,7 @@ mod GameEngine {
         pub def toDrawables(node: n, globalPos: Vec2.Vec2): List[Drawable]
     }
 
-    /// キーボードキー（Frogger で使用するキーのみ）
+    /// キーボードキー
     pub enum Key with Eq, Order, ToString {
         case W
         case A
@@ -66,6 +66,7 @@ mod GameEngine {
         case Left
         case Right
         case Enter
+        case Space
         case Escape
     }
 
@@ -108,7 +109,7 @@ mod GameEngine {
     //   GameEngine.render(updateScene(scene));
 
     /// 全ノードの毎フレーム処理を実行する
-    pub def process(delta: Float64, paused: Bool, scene: Scene[s]): Scene[s] \ Game
+    pub def process(delta: Float64, paused: Bool, scene: Scene[s]): Scene[s] \ {Game, Math.Random}
             with Node[s] =
         Scene.processAll(delta, paused, scene)
 
@@ -131,7 +132,7 @@ mod GameEngine {
         ScreenNotifyEvent.handleScreenNotify(screenWidth, screenHeight, scene)
 
     /// タイマータイムアウトを検出し TimerHandler で応答する
-    pub def emitTimers(scene: Scene[s]): Scene[s]
+    pub def emitTimers(scene: Scene[s]): Scene[s] \ Math.Random
             with TimerEvent.TimerHandler[s] =
         TimerEvent.handleTimeouts(scene)
 

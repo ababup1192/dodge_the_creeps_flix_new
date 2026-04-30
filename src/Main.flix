@@ -27,7 +27,9 @@ def main(): Unit \ IO =
             clearColor = {r = 0.0f32, g = 0.0f32, b = 0.0f32}
         };
        
-        run {
-            Game.start(GameEngine.Game.getFontAtlas("default"))
-        } with LwjglLayer.withLwjgl(config)
+        Math.Random.runWithIO(_ ->
+            run {
+                Game.start(GameEngine.Game.getFontAtlas("default"))
+            } with LwjglLayer.withLwjgl(config)
+        )
     }

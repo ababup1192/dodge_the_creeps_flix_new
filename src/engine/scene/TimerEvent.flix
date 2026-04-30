@@ -15,7 +15,8 @@ pub mod TimerEvent {
         /// timerPath: タイマーノードのパス
         /// state: タイマーノードのゲーム状態
         /// scene: 現在のシーン
-        pub def onTimeout(_timerPath: NodePath, _state: s, scene: Scene[s]): Scene[s] = scene
+        pub def onTimeout(_timerPath: NodePath, _state: s, scene: Scene[s]): Scene[s] \ Math.Random =
+            checked_ecast(scene)
     }
 
     /// timedOut=true の TimerWithState ノードパスを収集する
@@ -33,7 +34,7 @@ pub mod TimerEvent {
     /// 1. detectTimeoutPaths で対象パスを収集
     /// 2. 各パスに対して TimerHandler.onTimeout を呼び出し
     /// 3. 各パスの Timer.clearTimedOut を呼び出してフラグをリセット
-    pub def handleTimeouts(scene: Scene[s]): Scene[s] with TimerHandler[s] =
+    pub def handleTimeouts(scene: Scene[s]): Scene[s] \ Math.Random with TimerHandler[s] =
         let timedOutPaths = detectTimeoutPaths(scene);
         // onTimeout を呼び出し
         let sceneAfterHandlers = List.foldLeft((sc, path) ->

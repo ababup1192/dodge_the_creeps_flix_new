@@ -33,9 +33,9 @@ mod PlayerScene {
     def walkAnimation(): String = "walk"
     def upAnimation(): String = "up"
 
-    /// プレイヤーの衝突形状（Godot: CapsuleShape2D radius=27, height=68 を円で近似）
+    /// プレイヤーの衝突形状（Godot: CapsuleShape2D radius=27, height=68）
     def playerCollisionShape(): CollisionShape2D =
-        CollisionShape2D.CircleShape2D({radius = 27.0})
+        CollisionShape2D.CapsuleShape2D({radius = 27.0, height = 68.0, vertical = true})
 
     /// プレイヤーのアニメーション定義
     def playerAnimations(): Map[String, List[String]] =
@@ -53,9 +53,10 @@ mod PlayerScene {
         let sprite = AnimatedSprite2D.make(
             playerAnimations(),
             initialAnimation = walkAnimation(),
-            fps = 6.0,
+            fps = 5.0,
             startPosition(),
-            {x = 0.5, y = 0.5});
+            {x = 0.5, y = 0.5})
+            |> CanvasItem.setZIndex(10);
         let area = Area2D.make(Vec2.zero(), playerCollisionShape());
         let playerNode: PlayerNode = { sprite = sprite, area = area };
         scene
@@ -102,7 +103,7 @@ mod PlayerScene {
     // ゲーム開始: 位置リセット + 表示
     // ========================================================================
 
-    /// Godot の start(pos) を再現: 位置設定 + 回転リセット + show
+    /// Godot の start(pos) を再現: 位置設定 + 回転リセット + show + 衝突再有効化
     /// trail は visible 伝播により親（player）の表示に自動追従する
     pub def start(pos: Vec2.Vec2, scene: Scene[GameData]): Scene[GameData] =
         scene
@@ -111,6 +112,12 @@ mod PlayerScene {
                     |> position(pos)
                     |> rotation(0.0)
                     |> show)
+            |> setAreaMonitoring(true)
+
+    /// プレイヤーの Area2D の monitoring を設定する（衝突の有効/無効化）
+    pub def setAreaMonitoring(enabled: Bool, scene: Scene[GameData]): Scene[GameData] =
+        scene |> Scene.mapEngineNode(name() :: areaName() :: Nil,
+            EngineNode.mapArea2D(Area2D.setMonitoring(enabled)))
 
     // ========================================================================
     // 入力適用

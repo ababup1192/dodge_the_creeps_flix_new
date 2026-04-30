@@ -403,7 +403,7 @@ pub mod Scene {
     /// Godot では add_child() 時に _ready() が発火する。
     /// 本エンジンでは processAll の冒頭で毎フレームチェックし、
     /// 動的に追加されたノードにも ready を呼ぶことで同等の挙動を実現する。
-    def readyNew(scene: Scene[s]): Scene[s] \ GameEngine.Game with Node[s] =
+    def readyNew(scene: Scene[s]): Scene[s] \ {GameEngine.Game, Math.Random} with Node[s] =
         foldNodes((engineNode, path, sc) ->
             let Scene.Scene(r) = sc;
             if (not Set.memberOf(path, r#readiedPaths)) {
@@ -417,7 +417,7 @@ pub mod Scene {
     /// 全ノードの process を preorder（親→子）の順で呼び出す
     /// EngineNode.engineProcess（AnimSprite2D のフレーム送り等）も自動実行される
     /// 未 ready のノードがあれば先に ready を呼ぶ（動的スポーン対応）
-    pub def processAll(delta: Float64, paused: Bool, scene: Scene[s]): Scene[s] \ GameEngine.Game with Node[s] =
+    pub def processAll(delta: Float64, paused: Bool, scene: Scene[s]): Scene[s] \ {GameEngine.Game, Math.Random} with Node[s] =
         let readiedScene = readyNew(scene);
         foldNodes((engineNode, path, sc) ->
             if (ProcessMode.shouldProcess(paused, Node.getProcessMode(EngineNode.getState(engineNode)))) {

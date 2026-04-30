@@ -56,7 +56,7 @@ mod MobScene {
 
     /// Mob の衝突形状（Godot チュートリアル準拠の CapsuleShape2D）
     def mobCollisionShape(): CollisionShape2D =
-        CollisionShape2D.CapsuleShape2D({radius = 37.0, height = 100.0, vertical = true})
+        CollisionShape2D.CapsuleShape2D({radius = 37.0, height = 100.0, vertical = false})
 
     /// Mob のスプライトスケール（Godot mob.tscn: 0.75）
     def mobScale(): Vec2.Vec2 = {x = 0.75, y = 0.75}
@@ -108,6 +108,11 @@ mod MobScene {
     ///
     /// direction は spawnMob 時に設定された direction に ±π/4 のランダム偏差を加え、
     /// speed は 150〜250 の範囲でランダムに決定する。
+    /// アニメーション名に応じた FPS を返す（Godot mob.tscn 準拠: fly=3, swim=4, walk=4）
+    def fpsForAnimation(animation: String): Float64 =
+        if (animation == flyAnimation()) 3.0
+        else 4.0
+
     pub def ready(path: NodePath, direction: Float64, scene: Scene[GameData]): Scene[GameData] \ Math.Random =
         let animation = pickAnimation();
         let spritePath = List.append(path, spriteName() :: Nil);
@@ -122,6 +127,7 @@ mod MobScene {
                 EngineNode.mapAnimSprite2D(sprite ->
                     sprite
                         |> AnimatedSprite2D.play(animation)
+                        |> AnimatedSprite2D.setFps(fpsForAnimation(animation))
                         |> Node2D.setRotation(finalDir)))
             |> Scene.mapEngineNode(path,
                 EngineNode.mapRigidBody2D(RigidBody2D.setLinearVelocity({x = vx, y = vy})))

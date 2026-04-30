@@ -14,13 +14,13 @@ pub trait Node[s] {
     // ── ライフサイクル ──
 
     /// ノードがシーンツリーに追加された後、最初に一度だけ呼ばれる初期化コールバック
-    pub def ready(node: EngineNode[s], _path: NodePath, scene: Scene[s]): (EngineNode[s], Scene[s]) \ GameEngine.Game =
+    pub def ready(node: EngineNode[s], _path: NodePath, scene: Scene[s]): (EngineNode[s], Scene[s]) \ {GameEngine.Game, Math.Random} =
             checked_ecast((node, scene))
 
     /// 毎フレーム呼ばれる更新コールバック
     /// delta: 前フレームからの経過秒数（Float64）
-    pub def process(_delta: Float64, node: EngineNode[s], _path: NodePath, scene: Scene[s]): (EngineNode[s], Scene[s]) =
-            (node, scene)
+    pub def process(_delta: Float64, node: EngineNode[s], _path: NodePath, scene: Scene[s]): (EngineNode[s], Scene[s]) \ Math.Random =
+            checked_ecast((node, scene))
 
     /// 物理ステップ中に呼ばれる更新コールバック（Godot _physics_process 準拠）
     /// PhysicsStep.step の重力・積分の **前** に呼ばれる。

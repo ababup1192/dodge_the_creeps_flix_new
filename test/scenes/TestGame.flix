@@ -4,20 +4,22 @@
 // テスト用ヘルパー
 // ========================================================================
 
-def withMockEngine(f: Unit -> a \ ef + GameEngine.Game): a \ ef =
-    run f() with handler GameEngine.Game {
-        def render(_, k) = k(())
-        def shouldClose(k) = k(false)
-        def getDeltaTime(k) = k(0.016)
-        def isKeyPressed(_, k) = k(false)
-        def getMousePosition(k) = k(Vec2.zero())
-        def isMouseButtonPressed(_, k) = k(false)
-        def getFontAtlas(_, k) = k(testFontAtlas())
-        def getViewportRect(k) = k(Rect2.fromSize({x = 480.0, y = 720.0}))
-    }
+def withMockEngine(f: Unit -> a \ {GameEngine.Game, Math.Random}): a =
+    unsafe IO { Math.Random.runWithIO(_ ->
+        run f() with handler GameEngine.Game {
+            def render(_, k) = k(())
+            def shouldClose(k) = k(false)
+            def getDeltaTime(k) = k(0.016)
+            def isKeyPressed(_, k) = k(false)
+            def getMousePosition(k) = k(Vec2.zero())
+            def isMouseButtonPressed(_, k) = k(false)
+            def getFontAtlas(_, k) = k(testFontAtlas())
+            def getViewportRect(k) = k(Rect2.fromSize({x = 480.0, y = 720.0}))
+        }
+    ) }
 
 /// 指定キーが押されている GameEngine.Game ハンドラ
-def withKeysPressed(keys: Set[GameEngine.Key], f: Unit -> a \ ef + GameEngine.Game): a \ ef =
+def withKeysPressed(keys: Set[GameEngine.Key], f: Unit -> a \ GameEngine.Game): a =
     run f() with handler GameEngine.Game {
         def render(_, k) = k(())
         def shouldClose(k) = k(false)
@@ -177,7 +179,7 @@ def testInputDirectionArrow(): Unit \ Assert =
 /// キーなしでゼロベクトル
 @Test
 def testInputDirectionNone(): Unit \ Assert =
-    let dir = withMockEngine(() -> Game.readInputDirection());
+    let dir = withMockEngine(() -> checked_ecast(Game.readInputDirection()));
     Assert.assertEq(expected = (0.0, 0.0), vecToTuple(dir))
 
 // ========================================================================

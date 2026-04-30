@@ -94,12 +94,10 @@ def testMobSceneGravityDisabled(): Unit \ Assert =
 
 /// ready でアニメーション（fly/swim/walk）のいずれかが設定される
 @Test
-def testMobSceneReadyPicksValidAnimation(): Unit \ Assert =
-    let scene = unsafe IO { Math.Random.runWithIO(_ ->
-        Scene.empty()
-            |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0)
-            |> MobScene.ready("mob_0" :: Nil, 1.5708)
-    ) };
+def testMobSceneReadyPicksValidAnimation(): Unit \ {Assert, Math.Random} =
+    let scene = Scene.empty()
+        |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0)
+        |> MobScene.ready("mob_0" :: Nil, 1.5708);
     match Scene.getEngineNode("mob_0" :: "sprite" :: Nil, scene) {
         case Some(EngineNode.AnimSprite2DWithState(sprite, _)) =>
             let anim = AnimatedSprite2D.getCurrentAnimation(sprite);

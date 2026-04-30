@@ -39,7 +39,7 @@ pub type alias GameState = {
 
 instance Node[GameData] {
     redef ready(node: EngineNode[GameData],
-                path: NodePath, scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) \ GameEngine.Game =
+                path: NodePath, scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) \ {GameEngine.Game, Math.Random} =
         match node {
             case EngineNode.AnimSprite2DWithState(sprite, GameData.Player(playerNode, playerData)) =>
                 let (readySprite, readyPlayerData) = PlayerScene.ready(sprite, playerData);
@@ -48,7 +48,7 @@ instance Node[GameData] {
                 )
             case EngineNode.RigidBody2DWithState(_, GameData.MobData(_)) =>
                 let rot = Node2D.getRotation(node);
-                let newScene = unsafe IO { Math.Random.runWithIO(_ -> MobScene.ready(path, rot, scene)) };
+                let newScene = MobScene.ready(path, rot, scene);
                 // MobScene.ready が path のノードに linearVelocity を設定するため、
                 // 更新済みノードをシーンから取り直す（foldNodes の上書きを防ぐ）
                 match Scene.getEngineNode(path, newScene) {
@@ -59,15 +59,15 @@ instance Node[GameData] {
         }
 
     redef process(delta: Float64, node: EngineNode[GameData],
-                    _path: NodePath, scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) =
-        match node {
+                    _path: NodePath, scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) \ Math.Random =
+        checked_ecast(match node {
             case EngineNode.AnimSprite2DWithState(sprite, GameData.Player(playerNode, playerData)) =>
                 let movedSprite = PlayerScene.process(delta, sprite, playerData);
                 (EngineNode.AnimSprite2DWithState(movedSprite,
                     GameData.Player({ sprite = movedSprite | playerNode }, playerData))
                 , scene)
             case _ => (node, scene)
-        }
+        })
 }
 
 // 衝突判定
@@ -79,6 +79,7 @@ instance AreaHandler[GameData] {
             case (GameData.PlayerArea, GameData.MobData(_)) =>
                 scene
                     |> PlayerScene.mapSprite(CanvasItem.hide)
+                    |> PlayerScene.setAreaMonitoring(false)
             case _ => scene
         }
 }
@@ -98,12 +99,10 @@ instance ScreenNotifyHandler[GameData] {
 
 instance TimerEvent.TimerHandler[GameData] {
     redef onTimeout(timerPath: NodePath, state: GameData,
-                    scene: Scene[GameData]): Scene[GameData] =
+                    scene: Scene[GameData]): Scene[GameData] \ Math.Random =
         match state {
             case GameData.MobTimer(counter) =>
-                let newScene = unsafe IO { Math.Random.runWithIO(_ ->
-                    Game.spawnMobFromPath(counter, scene)
-                ) };
+                let newScene = Game.spawnMobFromPath(counter, scene);
                 // カウンタをインクリメント
                 Scene.setState(timerPath, GameData.MobTimer(counter + 1), newScene)
             case GameData.StartTimer =>
@@ -240,7 +239,7 @@ mod Game {
     // ========================================================================
 
     /// エンジン更新パイプライン（process → physics → collision → screen → timers）
-    def engineUpdate(dt: Float64, scene: Scene[GameData]): Scene[GameData] \ GameEngine.Game =
+    def engineUpdate(dt: Float64, scene: Scene[GameData]): Scene[GameData] \ {GameEngine.Game, Math.Random} =
         (GameEngine.process(dt, false)
         >> GameEngine.physicsProcess(dt, false, PhysicsStep.defaultGravity())
         >> GameEngine.emitCollision
@@ -248,7 +247,7 @@ mod Game {
         >> GameEngine.emitTimers)(scene)
 
     /// 入力読み取り + エンジン更新
-    def inputAndUpdate(dt: Float64, scene: Scene[GameData]): Scene[GameData] \ GameEngine.Game =
+    def inputAndUpdate(dt: Float64, scene: Scene[GameData]): Scene[GameData] \ {GameEngine.Game, Math.Random} =
         let dir = readInputDirection();
         engineUpdate(dt, PlayerScene.applyInput(dir)(scene))
 
@@ -256,11 +255,11 @@ mod Game {
     // メインループ
     // ========================================================================
 
-    pub def start(fontAtlas: FontAtlas): Unit \ GameEngine.Game + GameEngine.Audio =
+    pub def start(fontAtlas: FontAtlas): Unit \ {GameEngine.Game, GameEngine.Audio, Math.Random} =
         let state = buildState(fontAtlas);
         gameLoop(fontAtlas, state)
 
-    def gameLoop(fontAtlas: FontAtlas, state: GameState): Unit \ GameEngine.Game + GameEngine.Audio =
+    def gameLoop(fontAtlas: FontAtlas, state: GameState): Unit \ {GameEngine.Game, GameEngine.Audio, Math.Random} =
         if (GameEngine.Game.shouldClose()) ()
         else if (GameEngine.Game.isKeyPressed(GameEngine.Key.Escape)) ()
         else {
@@ -269,7 +268,8 @@ mod Game {
                 case GamePhase.Menu =>
                     let updatedScene = ButtonEvent.updateButtons(state#scene);
                     let enterPressed = GameEngine.Game.isKeyPressed(GameEngine.Key.Enter);
-                    let startPressed = HUDScene.isStartButtonJustPressed(updatedScene) or enterPressed;
+                    let spacePressed = GameEngine.Game.isKeyPressed(GameEngine.Key.Space);
+                    let startPressed = HUDScene.isStartButtonJustPressed(updatedScene) or enterPressed or spacePressed;
                     if (startPressed)
                         newGame({ scene = HUDScene.clearStartButtonPress(updatedScene) | state })
                     else
