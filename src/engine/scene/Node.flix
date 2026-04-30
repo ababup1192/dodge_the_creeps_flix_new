@@ -2,7 +2,7 @@
 /// see: https://docs.godotengine.org/en/stable/classes/class_node.html
 ///
 /// ライフサイクル:
-///   addNode → [毎フレーム] process(delta)
+///   addNode → ready() → [毎フレーム] process(delta)
 ///
 /// 全メソッドにデフォルト実装があり、必要なものだけオーバーライドすればよい。
 /// 型パラメータ s はゲーム固有の状態を表す。
@@ -10,6 +10,10 @@
 pub trait Node[s] {
 
     // ── ライフサイクル ──
+
+    /// ノードがシーンツリーに追加された後、最初に一度だけ呼ばれる初期化コールバック
+    pub def ready(node: EngineNode[s], _path: NodePath, scene: Scene[s]): (EngineNode[s], Scene[s]) \ Engine.Game =
+            checked_ecast((node, scene))
 
     /// 毎フレーム呼ばれる更新コールバック
     /// delta: 前フレームからの経過秒数（Float64）

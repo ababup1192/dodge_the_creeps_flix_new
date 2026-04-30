@@ -444,6 +444,9 @@ mod LwjglLayer {
                     case None => bug!("Font atlas not found: ${name}")
                 }
             }
+            def getViewportRect(k) = {
+                k({position = Vec2.zero(), size = {x = screenW, y = screenH}})
+            }
         };
 
         Callbacks.glfwFreeCallbacks(window);

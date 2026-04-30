@@ -60,13 +60,14 @@ mod Engine {
         case Escape
     }
 
-    /// ゲームエフェクト: 描画・ウィンドウ制御・時間取得・キー入力・フォント
+    /// ゲームエフェクト: 描画・ウィンドウ制御・時間取得・キー入力・フォント・ビューポート
     pub eff Game {
         def render(drawables: List[Drawable]): Unit
         def shouldClose(): Bool
         def getDeltaTime(): Float32
         def isKeyPressed(key: Key): Bool
         def getFontAtlas(name: String): FontAtlas
+        def getViewportRect(): Rect2.Rect2
     }
 
     /// macOS では -XstartOnFirstThread 付きでプロセスを再起動する。

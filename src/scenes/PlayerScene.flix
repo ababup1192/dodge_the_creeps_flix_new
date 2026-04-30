@@ -2,7 +2,7 @@
 
 mod PlayerScene {
 
-    pub type alias PlayerData = {velocity = Vec2.Vec2}
+    pub type alias PlayerData = {velocity = Vec2.Vec2, screenSize = Vec2.Vec2}
 
     // ========================================================================
     // 定数
@@ -44,8 +44,22 @@ mod PlayerScene {
                     fps = 6.0f32,
                 start(),
                     {x = 1.0f32, y = 1.0f32}),
-                GameData.Player({velocity = Vec2.zero()})),
+                GameData.Player({velocity = Vec2.zero(), screenSize = {x = Game.screenW(), y = Game.screenH()}})),
             scene)
+
+    // ========================================================================
+    // ready: ビューポートサイズ取得
+    // ========================================================================
+
+    /// プレイヤーの ready 処理: ビューポートサイズを取得して PlayerData に保存する
+    pub def ready(sprite: AnimatedSprite2D, playerData: PlayerData,
+                  scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) \ Engine.Game =
+        let viewportSize = Engine.Game.getViewportRect()#size;
+        (EngineNode.AnimSprite2DWithState(
+            sprite, 
+            GameData.Player({screenSize = viewportSize | playerData})), 
+            scene
+        )
 
     // ========================================================================
     // 毎フレーム処理（Node.process から委譲される）
@@ -53,11 +67,11 @@ mod PlayerScene {
 
     /// プレイヤーノードの毎フレーム処理
     pub def process(delta: Float64, sprite: AnimatedSprite2D,
-                    r: {velocity = Vec2.Vec2},
+                    playerData: PlayerData,
                     scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) =
         let dt = Float64.truncateToFloat32(delta);
-        let moved = movePlayer(dt, {x = Game.screenW(), y = Game.screenH()}, sprite, r);
-        (EngineNode.AnimSprite2DWithState(moved, GameData.Player(r)), scene)
+        let moved = movePlayer(dt, playerData#screenSize, sprite, {velocity = playerData#velocity});
+        (EngineNode.AnimSprite2DWithState(moved, GameData.Player(playerData)), scene)
 
     // ========================================================================
     // 移動
@@ -86,8 +100,11 @@ mod PlayerScene {
             else
                 Vec2.zero();
         scene
-            |> Scene.mapState(name() :: Nil, _ ->
-                GameData.Player({velocity = velocity}))
+            |> Scene.mapState(name() :: Nil, state ->
+                match state {
+                    case GameData.Player(playerData) =>
+                        GameData.Player({velocity = velocity | playerData})
+                })
             |> Scene.mapEngineNode(name() :: Nil,
                 EngineNode.mapAnimSprite2D(setPlayerAnimation(dir)))
 

@@ -12,6 +12,14 @@ pub type alias GameState = {
 // ── Node 実装 ──
 
 instance Node[GameData] {
+    redef ready(node: EngineNode[GameData],
+                _path: NodePath, scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) \ Engine.Game =
+        match node {
+            case EngineNode.AnimSprite2DWithState(sprite, GameData.Player(playerData)) =>
+                PlayerScene.ready(sprite, playerData, scene)
+            case _ => checked_ecast((node, scene))
+        }
+
     redef process(delta: Float64, node: EngineNode[GameData],
                     _path: NodePath, scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) =
         match node {
@@ -70,7 +78,9 @@ mod Game {
     // ========================================================================
 
     pub def start(fontAtlas: FontAtlas): Unit \ Engine.Game =
-        gameLoop(fontAtlas, buildState(fontAtlas))
+        let state = buildState(fontAtlas);
+        let readyState: GameState = { scene = Scene.readyAll(state#scene) | state };
+        gameLoop(fontAtlas, readyState)
 
     def gameLoop(fontAtlas: FontAtlas, state: GameState): Unit \ Engine.Game =
         if (Engine.Game.shouldClose()) ()

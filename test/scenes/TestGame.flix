@@ -11,6 +11,7 @@ def withMockEngine(f: Unit -> a \ ef + Engine.Game): a \ ef =
         def getDeltaTime(k) = k(0.016f32)
         def isKeyPressed(_, k) = k(false)
         def getFontAtlas(_, k) = k(testFontAtlas())
+        def getViewportRect(k) = k(Rect2.fromSize({x = 480.0f32, y = 720.0f32}))
     }
 
 /// 指定キーが押されている Engine.Game ハンドラ
@@ -21,6 +22,7 @@ def withKeysPressed(keys: Set[Engine.Key], f: Unit -> a \ ef + Engine.Game): a \
         def getDeltaTime(k) = k(0.016f32)
         def isKeyPressed(key, k) = k(Set.memberOf(key, keys))
         def getFontAtlas(_, k) = k(testFontAtlas())
+        def getViewportRect(k) = k(Rect2.fromSize({x = 480.0f32, y = 720.0f32}))
     }
 
 /// テスト用のダミー FontAtlas（空のグリフマップ）
@@ -260,8 +262,11 @@ def testApplyInputUpRotation(): Unit \ Assert =
 @Test
 def testPlayerProcessMoves(): Unit \ Assert =
     let scene = testScene()
-        |> Scene.mapState("player" :: Nil, _ ->
-            GameData.Player({velocity = {x = 400.0f32, y = 0.0f32}}));
+        |> Scene.mapState("player" :: Nil, state ->
+            match state {
+                case GameData.Player(playerData) =>
+                    GameData.Player({velocity = {x = 400.0f32, y = 0.0f32} | playerData})
+            });
     let pos = scene |> Scene.processAll(0.1, false) |> Scene.globalPosition("player");
     Assert.assertEq(expected = (280.0f32, 360.0f32), vecToTuple(pos))
 
@@ -275,8 +280,11 @@ def testPlayerProcessStays(): Unit \ Assert =
 @Test
 def testPlayerClampRight(): Unit \ Assert =
     let scene = testScene()
-        |> Scene.mapState("player" :: Nil, _ ->
-            GameData.Player({velocity = {x = 400.0f32, y = 0.0f32}}));
+        |> Scene.mapState("player" :: Nil, state ->
+            match state {
+                case GameData.Player(playerData) =>
+                    GameData.Player({velocity = {x = 400.0f32, y = 0.0f32} | playerData})
+            });
     let pos = scene |> Scene.processAll(1.0, false) |> Scene.globalPosition("player");
     Assert.assertEq(expected = (Game.screenW(), 360.0f32), vecToTuple(pos))
 
@@ -284,8 +292,11 @@ def testPlayerClampRight(): Unit \ Assert =
 @Test
 def testPlayerClampLeft(): Unit \ Assert =
     let scene = testScene()
-        |> Scene.mapState("player" :: Nil, _ ->
-            GameData.Player({velocity = {x = -400.0f32, y = 0.0f32}}));
+        |> Scene.mapState("player" :: Nil, state ->
+            match state {
+                case GameData.Player(playerData) =>
+                    GameData.Player({velocity = {x = -400.0f32, y = 0.0f32} | playerData})
+            });
     let pos = scene |> Scene.processAll(1.0, false) |> Scene.globalPosition("player");
     Assert.assertEq(expected = (0.0f32, 360.0f32), vecToTuple(pos))
 
@@ -318,4 +329,18 @@ def testSwitchAnimResetsFrame(): Unit \ Assert =
                 (AnimatedSprite2D.getCurrentAnimation(sprite),
                  AnimatedSprite2D.currentTexture(sprite)))
         case _ => bug!("player not found")
+    }
+
+// ========================================================================
+// ready: ビューポートサイズ取得
+// ========================================================================
+
+/// readyAll 後に screenSize がモックのビューポートサイズ (480x720) に設定される
+@Test
+def testReadySetsScreenSize(): Unit \ Assert =
+    let scene = withMockEngine(() -> Scene.readyAll(testScene()));
+    match Scene.get("player", scene) {
+        case Some(GameData.Player(r)) =>
+            Assert.assertEq(expected = (480.0f32, 720.0f32), vecToTuple(r#screenSize))
+        case _ => bug!("player state mismatch")
     }

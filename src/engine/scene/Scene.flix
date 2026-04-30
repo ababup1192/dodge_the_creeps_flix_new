@@ -347,6 +347,12 @@ pub mod Scene {
             Ref.get(sceneRef)
         }
 
+    /// 全ノードの ready を preorder で一度だけ呼び出す
+    pub def readyAll(scene: Scene[s]): Scene[s] \ Engine.Game with Node[s] =
+        foldNodes((engineNode, path, sc) ->
+            Node.ready(engineNode, path, sc),
+            scene)
+
     /// 全ノードの process を preorder（親→子）の順で呼び出す
     /// EngineNode.engineProcess（AnimSprite2D のフレーム送り等）も自動実行される
     pub def processAll(delta: Float64, paused: Bool, scene: Scene[s]): Scene[s] with Node[s] =
