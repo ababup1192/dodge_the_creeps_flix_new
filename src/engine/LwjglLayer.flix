@@ -14,11 +14,20 @@ mod LwjglLayer {
     import org.lwjgl.stb.STBImage
     import org.lwjgl.stb.STBTruetype
     import org.lwjgl.stb.STBTTBakedChar
+    import org.lwjgl.stb.STBVorbis
+    import org.lwjgl.openal.AL
+    import org.lwjgl.openal.AL10
+    import org.lwjgl.openal.ALC
+    import org.lwjgl.openal.ALC10
     import org.lwjgl.BufferUtils
     import org.lwjgl.system.MemoryStack
     import org.lwjgl.system.MemoryUtil
     import java.lang.System
     import java.io.FileInputStream
+    import java.nio.ByteBuffer
+    import java.nio.ByteOrder
+    import java.nio.file.Files
+    import java.nio.file.Paths
 
     import java.lang.Math
 
@@ -159,6 +168,16 @@ mod LwjglLayer {
         case GameEngine.Key.Right => 262
         case GameEngine.Key.Enter  => 257
         case GameEngine.Key.Escape => 256
+    }
+
+    // ========================================================================
+    // Mouse Button Mapping (GameEngine.MouseButton → GLFW mouse button code)
+    // ========================================================================
+
+    def mouseButtonToGlfw(button: GameEngine.MouseButton): Int32 = match button {
+        case GameEngine.MouseButton.Left   => 0
+        case GameEngine.MouseButton.Right  => 1
+        case GameEngine.MouseButton.Middle => 2
     }
 
     // ========================================================================
@@ -385,10 +404,71 @@ mod LwjglLayer {
         }, (Map.empty(), registry), manifest)
 
     // ========================================================================
+    // Audio Loading
+    // ========================================================================
+
+    /// OGG ファイルを STBVorbis でデコードし、OpenAL バッファにアップロードする
+    def loadOggToALBuffer(path: String): Int32 \ IO =
+        let stack = MemoryStack.stackPush();
+        let channelsBuf = stack.mallocInt(1);
+        let sampleRateBuf = stack.mallocInt(1);
+        let pcm = STBVorbis.stb_vorbis_decode_filename(path, channelsBuf, sampleRateBuf);
+        if (Object.isNull(pcm)) {
+            discard MemoryStack.stackPop();
+            bug!("Failed to decode OGG: ${path}")
+        } else {
+            let channels = channelsBuf.get(0);
+            let sampleRate = sampleRateBuf.get(0);
+            discard MemoryStack.stackPop();
+            let format = if (channels == 1) AL10.AL_FORMAT_MONO16 else AL10.AL_FORMAT_STEREO16;
+            let buffer = AL10.alGenBuffers();
+            AL10.alBufferData(buffer, format, pcm, sampleRate);
+            MemoryUtil.memFree(pcm);
+            buffer
+        }
+
+    /// WAV ファイルをパースし、OpenAL バッファにアップロードする
+    def loadWavToALBuffer(path: String): Int32 \ IO =
+        let wavBytes = Files.readAllBytes(Paths.get(path));
+        let hdr = ByteBuffer.wrap(wavBytes);
+        discard hdr.order(ByteOrder.LITTLE_ENDIAN);
+        let channels = Int16.toInt32(hdr.getShort(22));
+        let sampleRate = hdr.getInt(24);
+        let bitsPerSample = Int16.toInt32(hdr.getShort(34));
+        let dataOffset = match AudioUtil.findDataChunkOffset(i -> hdr.get(i), i -> hdr.getInt(i), hdr.limit(), 12) {
+            case Some(off) => off
+            case None      => bug!("WAV data chunk not found: ${path}")
+        };
+        let dataSize = hdr.getInt(dataOffset + 4);
+        let pcmStart = dataOffset + 8;
+        let pcmBuf = MemoryUtil.memAlloc(dataSize);
+        discard pcmBuf.put(wavBytes, pcmStart, dataSize);
+        discard pcmBuf.flip();
+        let format = AudioUtil.alFormat(channels, bitsPerSample);
+        let buffer = AL10.alGenBuffers();
+        AL10.alBufferData(buffer, format, pcmBuf, sampleRate);
+        MemoryUtil.memFree(pcmBuf);
+        buffer
+
+    /// サウンドマニフェストから全音声を読み込み、AudioRegistry（名前 → OpenAL ソース ID）を返す
+    def loadAudioRegistry(manifest: List[GameEngine.AudioEntry]): GameEngine.AudioRegistry \ IO =
+        List.foldLeft((registry, entry) -> {
+            let buffer = if (String.endsWith({suffix = ".ogg"}, entry#path))
+                loadOggToALBuffer(entry#path)
+            else
+                loadWavToALBuffer(entry#path);
+            let source = AL10.alGenSources();
+            AL10.alSourcei(source, AL10.AL_BUFFER, buffer);
+            AL10.alSourcei(source, AL10.AL_LOOPING, if (entry#looping) AL10.AL_TRUE else AL10.AL_FALSE);
+            println("  ${entry#path} loaded");
+            Map.insert(entry#name, source, registry)
+        }, Map.empty(), manifest)
+
+    // ========================================================================
     // LWJGL Handler for GameEngine.Game effect
     // ========================================================================
 
-    pub def withLwjgl(config: GameEngine.EngineConfig, f: Unit -> a \ ef): a \ ef - GameEngine.Game + IO =
+    pub def withLwjgl(config: GameEngine.EngineConfig, f: Unit -> a \ ef): a \ ef - GameEngine.Game - GameEngine.Audio + IO =
         if (not GLFW.glfwInit()) {
             println("GLFW init failed");
             bug!("GLFW failed")
@@ -431,6 +511,29 @@ mod LwjglLayer {
         println("Baking font atlases...");
         let (fontAtlases, registry) = bakeFontAtlases(config#fontManifest, registry0);
 
+        // ===== OpenAL audio init =====
+        println("Initializing audio...");
+        let alDevice = ALC10.nalcOpenDevice(MemoryUtil.NULL);
+        if (alDevice == 0i64) {
+            println("Failed to open OpenAL device");
+            bug!("Failed to open OpenAL device")
+        } else ();
+        let alcCaps = ALC.createCapabilities(alDevice);
+        let alContext = ALC10.nalcCreateContext(alDevice, MemoryUtil.NULL);
+        if (alContext == 0i64) {
+            println("Failed to create OpenAL context");
+            bug!("Failed to create OpenAL context")
+        } else ();
+        if (not ALC10.alcMakeContextCurrent(alContext)) {
+            println("Failed to make OpenAL context current");
+            bug!("Failed to make OpenAL context current")
+        } else ();
+        discard AL.createCapabilities(alcCaps);
+
+        println("  Loading sounds...");
+        let audioRegistry = loadAudioRegistry(config#soundManifest);
+        println("  Audio ready");
+
         let timeHolder = Array#{System.nanoTime()} @ Static;
 
         // リサイズ中の再描画用に最後のフレームの描画リストを保持する
@@ -447,7 +550,24 @@ mod LwjglLayer {
         });
 
         let result = run {
-            f()
+            run {
+                f()
+            } with handler GameEngine.Audio {
+                def playAudio(name, k) = {
+                    match Map.get(name, audioRegistry) {
+                        case Some(src) => AL10.alSourceStop(src); AL10.alSourcePlay(src)
+                        case None      => ()
+                    };
+                    k(())
+                }
+                def stopAudio(name, k) = {
+                    match Map.get(name, audioRegistry) {
+                        case Some(src) => AL10.alSourceStop(src)
+                        case None      => ()
+                    };
+                    k(())
+                }
+            }
         } with handler GameEngine.Game {
             def render(drawables, k) = {
                 Array.put(drawables, 0, drawablesHolder);
@@ -478,6 +598,30 @@ mod LwjglLayer {
                 let code = keyToGlfw(key);
                 k(GLFW.glfwGetKey(window, code) == 1)
             }
+            def getMousePosition(k) = {
+                let mStack = MemoryStack.stackPush();
+                let xBuf = mStack.mallocDouble(1);
+                let yBuf = mStack.mallocDouble(1);
+                GLFW.glfwGetCursorPos(window, xBuf, yBuf);
+                let cursorX = xBuf.get(0);
+                let cursorY = yBuf.get(0);
+                discard MemoryStack.stackPop();
+                // ウィンドウサイズからデザイン座標に変換
+                let wStack = MemoryStack.stackPush();
+                let winW = wStack.mallocInt(1);
+                let winH = wStack.mallocInt(1);
+                GLFW.glfwGetWindowSize(window, winW, winH);
+                let windowW = Int32.toFloat64(winW.get(0));
+                let windowH = Int32.toFloat64(winH.get(0));
+                discard MemoryStack.stackPop();
+                let designX = cursorX / windowW * screenW;
+                let designY = cursorY / windowH * screenH;
+                k({x = designX, y = designY})
+            }
+            def isMouseButtonPressed(button, k) = {
+                let code = mouseButtonToGlfw(button);
+                k(GLFW.glfwGetMouseButton(window, code) == 1)
+            }
             def getFontAtlas(name, k) = {
                 match Map.get(name, fontAtlases) {
                     case Some(atlas) => k(atlas)
@@ -488,6 +632,11 @@ mod LwjglLayer {
                 k({position = Vec2.zero(), size = {x = screenW, y = screenH}})
             }
         };
+
+        // OpenAL cleanup
+        Map.forEach((_, src) -> AL10.alDeleteSources(src), audioRegistry);
+        ALC10.alcDestroyContext(alContext);
+        discard ALC10.alcCloseDevice(alDevice);
 
         Callbacks.glfwFreeCallbacks(window);
         GLFW.glfwDestroyWindow(window);

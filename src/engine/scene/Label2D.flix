@@ -55,52 +55,59 @@ mod Label2D {
 
     /// テキストから Drawable のリストを生成する
     /// 各グリフに対して1つの Drawable を生成する
+    /// テキスト中の改行コード(\n)で複数行に分割される
     pub def toDrawables(label: Label2D, globalPos: Vec2.Vec2): List[GameEngine.Drawable] =
         let Label2D.Label2D(r) = label;
         let atlas = r#fontAtlas;
         let scale = r#fontSize / atlas#fontSize;
-        let chars = String.toList(r#text);
-        // 各文字の advance を取得
-        let advances = List.map(ch -> {
-            let cp = TextLayout.charToCodePoint(ch);
-            match Map.get(cp, atlas#glyphs) {
-                case Some(gm) => gm#advance
-                case None => 0.0
-            }
-        }, chars);
-        // センタリングオフセット
-        let offsetX = if (r#centered)
-            TextLayout.centerOffset(TextLayout.totalAdvance(advances), scale)
-        else 0.0;
-        // レイアウト位置計算
         let lineHeight = r#fontSize * TextLayout.lineHeightMultiplier();
-        let positions = TextLayout.layoutPositions(advances, 0.0, scale, lineHeight);
-        // グリフごとに Drawable を生成
-        let charPositions = List.zip(chars, positions);
-        List.filterMap(pair -> {
-            let (ch, penPos) = pair;
-            let cp = TextLayout.charToCodePoint(ch);
-            match Map.get(cp, atlas#glyphs) {
-                case Some(gm) =>
-                    let qb = TextLayout.glyphQuadBounds(penPos, gm, scale, globalPos, offsetX);
-                    let w = qb#x1 - qb#x0;
-                    let h = qb#y1 - qb#y0;
-                    if (w <= 0.0 or h <= 0.0) None
-                    else Some({
-                        texture = atlas#textureName,
-                        position = {x = qb#x0, y = qb#y0},
-                        scale = {x = w / atlas#textureSize, y = h / atlas#textureSize},
-                        rotation = 0.0,
-                        color = r#modulate,
-                        alpha = 1.0f32,
-                        centered = false,
-                        uvOffset = {x = gm#s0, y = gm#t0},
-                        uvScale = {x = gm#s1 - gm#s0, y = gm#t1 - gm#t0},
-                        zIndex = r#zIndex
-                    })
-                case None => None
-            }
-        }, charPositions)
+        let lines = TextLayout.splitLines(r#text);
+        let result = List.foldLeft((acc, lineChars) -> {
+            let lineIdx = acc#lineIdx;
+            // 各文字の advance を取得
+            let advances = List.map(ch -> {
+                let cp = TextLayout.charToCodePoint(ch);
+                match Map.get(cp, atlas#glyphs) {
+                    case Some(gm) => gm#advance
+                    case None => 0.0
+                }
+            }, lineChars);
+            // 行ごとにセンタリングオフセットを計算
+            let offsetX = if (r#centered)
+                TextLayout.centerOffset(TextLayout.totalAdvance(advances), scale)
+            else 0.0;
+            // レイアウト位置計算
+            let positions = TextLayout.layoutPositions(advances, 0.0, scale, lineHeight);
+            let yOff = Int32.toFloat64(lineIdx) * lineHeight;
+            let lineGlobalPos = {x = globalPos#x, y = globalPos#y + yOff};
+            // グリフごとに Drawable を生成
+            let lineDrawables = List.filterMap(pair -> {
+                let (ch, penPos) = pair;
+                let cp = TextLayout.charToCodePoint(ch);
+                match Map.get(cp, atlas#glyphs) {
+                    case Some(gm) =>
+                        let qb = TextLayout.glyphQuadBounds(penPos, gm, scale, lineGlobalPos, offsetX);
+                        let w = qb#x1 - qb#x0;
+                        let h = qb#y1 - qb#y0;
+                        if (w <= 0.0 or h <= 0.0) None
+                        else Some({
+                            texture = atlas#textureName,
+                            position = {x = qb#x0, y = qb#y0},
+                            scale = {x = w / atlas#textureSize, y = h / atlas#textureSize},
+                            rotation = 0.0,
+                            color = r#modulate,
+                            alpha = 1.0f32,
+                            centered = false,
+                            uvOffset = {x = gm#s0, y = gm#t0},
+                            uvScale = {x = gm#s1 - gm#s0, y = gm#t1 - gm#t0},
+                            zIndex = r#zIndex
+                        })
+                    case None => None
+                }
+            }, List.zip(lineChars, positions));
+            {drawables = List.append(acc#drawables, lineDrawables), lineIdx = lineIdx + 1}
+        }, {drawables = (Nil: List[GameEngine.Drawable]), lineIdx = 0}, lines);
+        result#drawables
 }
 
 // -- CanvasItem 実装 --

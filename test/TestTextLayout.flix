@@ -225,4 +225,55 @@ mod TestTextLayout {
         Assert.assertTrue(approx(q#y0, 34.0));
         Assert.assertTrue(approx(q#x1, 32.0));
         Assert.assertTrue(approx(q#y1, 54.0))
+
+    // ========================================================================
+    // splitLines
+    // ========================================================================
+
+    @Test
+    def testSplitLinesNoNewline(): Unit \ Assert =
+        let result = TextLayout.splitLines("ABC");
+        Assert.assertTrue(List.length(result) == 1);
+        Assert.assertTrue(List.head(result) == Some('A' :: 'B' :: 'C' :: Nil))
+
+    @Test
+    def testSplitLinesEmpty(): Unit \ Assert =
+        let result = TextLayout.splitLines("");
+        Assert.assertTrue(List.length(result) == 1);
+        Assert.assertTrue(List.head(result) == Some(Nil))
+
+    @Test
+    def testSplitLinesTwoLines(): Unit \ Assert =
+        let result = TextLayout.splitLines("AB\nCD");
+        region rc {
+            let r = List.toArray(rc, result);
+            Assert.assertTrue(Array.length(r) == 2);
+            Assert.assertTrue(Array.get(0, r) == 'A' :: 'B' :: Nil);
+            Assert.assertTrue(Array.get(1, r) == 'C' :: 'D' :: Nil)
+        }
+
+    @Test
+    def testSplitLinesThreeLines(): Unit \ Assert =
+        let result = TextLayout.splitLines("A\nB\nC");
+        Assert.assertTrue(List.length(result) == 3)
+
+    @Test
+    def testSplitLinesTrailingNewline(): Unit \ Assert =
+        let result = TextLayout.splitLines("AB\n");
+        region rc {
+            let r = List.toArray(rc, result);
+            Assert.assertTrue(Array.length(r) == 2);
+            Assert.assertTrue(Array.get(0, r) == 'A' :: 'B' :: Nil);
+            Assert.assertTrue(Array.get(1, r) == Nil)
+        }
+
+    @Test
+    def testSplitLinesOnlyNewline(): Unit \ Assert =
+        let result = TextLayout.splitLines("\n");
+        region rc {
+            let r = List.toArray(rc, result);
+            Assert.assertTrue(Array.length(r) == 2);
+            Assert.assertTrue(Array.get(0, r) == Nil);
+            Assert.assertTrue(Array.get(1, r) == Nil)
+        }
 }

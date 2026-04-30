@@ -21,8 +21,8 @@ mod PlayerScene {
     /// Trail 子ノード名
     def trailName(): String = "trail"
 
-    /// プレイヤー初期位置（画面中央）
-    def startPosition(): Vec2.Vec2 = {x = 240.0, y = 360.0}
+    /// プレイヤー初期位置（Godot 版準拠）
+    def startPosition(): Vec2.Vec2 = {x = 240.0, y = 450.0}
 
     /// プレイヤー移動速度（px/秒）
     def speed(): Float64 = 400.0
@@ -48,7 +48,7 @@ mod PlayerScene {
     // シーン構築
     // ========================================================================
 
-    /// プレイヤーノードをシーンに追加する（Area2D 子ノード付き）
+    /// プレイヤーノードをシーンに追加する（Area2D 子ノード付き、初期非表示）
     pub def addPlayer(scene: Scene[GameData]): Scene[GameData] =
         let sprite = AnimatedSprite2D.make(
             playerAnimations(),
@@ -73,6 +73,7 @@ mod PlayerScene {
                         startScale = 0.5, endScale = 0.324
                     }) |> CanvasItem.setZIndex(-1),
                     GameData.PlayerTrail))
+            |> mapSprite(CanvasItem.hide)
 
     // ========================================================================
     // ready: ビューポートサイズ取得
@@ -103,11 +104,13 @@ mod PlayerScene {
 
     /// Godot の start(pos) を再現: 位置設定 + 回転リセット + show
     pub def start(pos: Vec2.Vec2, scene: Scene[GameData]): Scene[GameData] =
-        scene |> mapSprite(sprite ->
-            sprite
-                |> position(pos)
-                |> rotation(0.0)
-                |> show)
+        scene
+            |> mapSprite(sprite ->
+                sprite
+                    |> position(pos)
+                    |> rotation(0.0)
+                    |> show)
+            |> Scene.mapEngineNode(name() :: trailName() :: Nil, CanvasItem.show)
 
     // ========================================================================
     // 入力適用

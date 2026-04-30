@@ -18,7 +18,11 @@ def main(): Unit \ IO =
                 {name = "enemySwimming_2", path = "textures/enemySwimming_2.png", hasAlpha = true} ::
                 Nil,
             fontManifest =
-                {name = "default", path = "textures/Xolonium-Regular.ttf", fontSize = 32.0} ::
+                {name = "default", path = "textures/Xolonium-Regular.ttf", fontSize = 60.0} ::
+                Nil,
+            soundManifest =
+                {name = "music", path = "sounds/House In a Forest Loop.ogg", looping = true} ::
+                {name = "death", path = "sounds/gameover.wav", looping = false} ::
                 Nil,
             clearColor = {r = 0.0f32, g = 0.0f32, b = 0.0f32}
         };

@@ -330,6 +330,7 @@ pub mod Scene {
     // ========================================================================
 
     /// パスでグローバル座標を計算
+    /// CanvasLayer は親の座標チェーンを断ち切り、自身の offset をスクリーン基点とする
     pub def globalPositionAt(path: NodePath, scene: Scene[s]): Vec2.Vec2 =
         match path {
             case Nil => Vec2.zero()
@@ -342,8 +343,14 @@ pub mod Scene {
                 match getEngineNode(path, scene) {
                     case None => Vec2.zero()
                     case Some(engineNode) =>
-                        let localPos = Node2D.getPosition(engineNode);
-                        Vec2.add(localPos, globalPositionAt(initPath(path), scene))
+                        match engineNode {
+                            case EngineNode.CanvasLayerWithState(_, _) =>
+                                // CanvasLayer は親の座標を無視し、自身の offset だけを返す
+                                Node2D.getPosition(engineNode)
+                            case _ =>
+                                let localPos = Node2D.getPosition(engineNode);
+                                Vec2.add(localPos, globalPositionAt(initPath(path), scene))
+                        }
                 }
         }
 
@@ -431,6 +438,40 @@ pub mod Scene {
             scene)
 
     // ========================================================================
+    // CanvasLayer コンテキスト
+    // ========================================================================
+
+    /// パスの祖先を上から下へ辿り、CanvasLayer のレイヤーオフセットと可視性を返す
+    ///
+    /// CanvasLayer が見つかった場合:
+    ///   - layerOffset: layer * CanvasLayer.layerStride（子ノードの z-index に加算）
+    ///   - visible: 全祖先 CanvasLayer が可視であれば true
+    def canvasLayerContext(path: NodePath, scene: Scene[s]): {layerOffset = Int32, visible = Bool} =
+        canvasLayerContextWalk(Nil, path, scene, {layerOffset = 0, visible = true})
+
+    /// canvasLayerContext の内部実装（パスを上から下へ辿る末尾再帰）
+    def canvasLayerContextWalk(
+        prefix: NodePath,
+        remaining: NodePath,
+        scene: Scene[s],
+        ctx: {layerOffset = Int32, visible = Bool}
+    ): {layerOffset = Int32, visible = Bool} =
+        match remaining {
+            case Nil => ctx
+            // 最後の要素はノード自身なのでスキップ（祖先のみ検査）
+            case _ :: Nil => ctx
+            case name :: rest =>
+                let currentPath = List.append(prefix, name :: Nil);
+                let newCtx = match getEngineNode(currentPath, scene) {
+                    case Some(EngineNode.CanvasLayerWithState(cl, _)) =>
+                        let CanvasLayer.CanvasLayer(r) = cl;
+                        {layerOffset = r#drawLayer * CanvasLayer.layerStride(), visible = ctx#visible and r#visible}
+                    case _ => ctx
+                };
+                canvasLayerContextWalk(currentPath, rest, scene, newCtx)
+        }
+
+    // ========================================================================
     // 描画（制約なし — EngineNode の Renderable を直接使用）
     // ========================================================================
 
@@ -451,16 +492,24 @@ pub mod Scene {
 
     /// 可視ノードを Drawable のリストに変換する
     /// 各ノードが複数 Drawable を返せるよう flatMap ベースで処理する
+    /// CanvasLayer の子ノードには layer に基づく z-index オフセットを適用する
     pub def toDrawables(scene: Scene[s]): List[GameEngine.Drawable] =
         preorderPaths(scene)
             |> List.flatMap(path ->
-                match getEngineNode(path, scene) {
-                    case Some(engineNode) =>
-                        if (CanvasItem.isVisible(engineNode))
-                            GameEngine.Renderable.toDrawables(engineNode, globalPositionAt(path, scene))
-                        else Nil
-                    case None => Nil
-                }
+                let clCtx = canvasLayerContext(path, scene);
+                // 祖先の CanvasLayer が非表示なら子ノードも描画しない
+                if (not clCtx#visible) Nil
+                else
+                    match getEngineNode(path, scene) {
+                        case Some(engineNode) =>
+                            if (CanvasItem.isVisible(engineNode)) {
+                                let drawables = GameEngine.Renderable.toDrawables(engineNode, globalPositionAt(path, scene));
+                                // レイヤーオフセットがある場合のみ z-index を加算
+                                if (clCtx#layerOffset == 0) drawables
+                                else List.map(d -> {zIndex = d#zIndex + clCtx#layerOffset | d}, drawables)
+                            } else Nil
+                        case None => Nil
+                    }
             )
             |> List.sortBy(d -> d#zIndex)
 }

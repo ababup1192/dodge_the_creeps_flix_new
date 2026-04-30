@@ -19,6 +19,17 @@ mod TextLayout {
     pub def totalAdvance(advances: List[Float64]): Float64 =
         List.foldLeft((acc, a) -> acc + a, 0.0, advances)
 
+    /// Split text into lines at newline characters (codepoint 10).
+    pub def splitLines(text: String): List[List[Char]] =
+        let chars = String.toList(text);
+        let result = List.foldLeft((acc, ch) -> {
+            if (Char.toBmpCodePoint(ch) == 10)
+                {lines = List.reverse(acc#current) :: acc#lines, current = (Nil: List[Char])}
+            else
+                {lines = acc#lines, current = ch :: acc#current}
+        }, {lines = (Nil: List[List[Char]]), current = (Nil: List[Char])}, chars);
+        List.reverse(List.reverse(result#current) :: result#lines)
+
     /// Compute pen positions for each character with word-wrap support.
     pub def layoutPositions(advances: List[Float64], wrapWidth: Float64,
                             scale: Float64, lineHeight: Float64): List[(Float64, Float64)] =

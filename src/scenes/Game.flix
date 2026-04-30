@@ -1,5 +1,13 @@
 // Game — Dodge the Creeps ゲーム専用の GameData 定義とシーン構築・ゲームループ
 
+/// ゲームフェーズ
+pub enum GamePhase with Eq {
+    case Menu
+    case GetReady
+    case Playing
+    case GameOver
+}
+
 /// ゲーム固有の状態データ
 pub enum GameData {
     case Player(PlayerScene.PlayerNode, PlayerScene.PlayerData)
@@ -11,11 +19,20 @@ pub enum GameData {
     case MobTimer(Int32)
     case MobPath
     case Background
+    case StartTimer
+    case ScoreTimer
+    case ScoreLabel(Int32)
+    case MessageLabel
+    case HUDLayer
+    case StartButton
+    case MessageTimer
+    case TitleTimer
 }
 
 pub type alias GameState = {
     scene = Scene[GameData],
-    mobCounter = Int32
+    mobCounter = Int32,
+    phase = GamePhase
 }
 
 // ── Node 実装 ──
@@ -38,8 +55,6 @@ instance Node[GameData] {
                     case Some(en) => (en, newScene)
                     case None => (node, newScene)
                 }
-            case EngineNode.TimerWithState(timer, GameData.MobTimer(counter)) =>
-                (EngineNode.TimerWithState(Timer.start(timer), GameData.MobTimer(counter)), scene)
             case _ => (node, scene)
         }
 
@@ -62,8 +77,9 @@ instance AreaHandler[GameData] {
                           scene: Scene[GameData]): Scene[GameData] =
         match (selfState, otherState) {
             case (GameData.PlayerArea, GameData.MobData(_)) =>
-                PlayerScene.mapSprite(CanvasItem.hide, scene)
-                    |> Scene.removeGroup(MobScene.mobGroup())
+                scene
+                    |> PlayerScene.mapSprite(CanvasItem.hide)
+                    |> Scene.mapEngineNode("player" :: "trail" :: Nil, CanvasItem.hide)
             case _ => scene
         }
 }
@@ -91,6 +107,24 @@ instance TimerEvent.TimerHandler[GameData] {
                 ) };
                 // カウンタをインクリメント
                 Scene.setState(timerPath, GameData.MobTimer(counter + 1), newScene)
+            case GameData.StartTimer =>
+                scene
+                    |> Scene.mapEngineNode("mob_timer" :: Nil, EngineNode.mapTimer(Timer.start))
+                    |> Scene.mapEngineNode("score_timer" :: Nil, EngineNode.mapTimer(Timer.start))
+                    |> HUDScene.hideMessage
+            case GameData.ScoreTimer =>
+                match Scene.getState(HUDScene.scoreLabelPath(), scene) {
+                    case Some(GameData.ScoreLabel(score)) =>
+                        HUDScene.updateScore(score + 1, scene)
+                    case _ => scene
+                }
+            case GameData.MessageTimer =>
+                scene
+                    |> HUDScene.showMessage("Dodge the\nCreeps")
+                    |> HUDScene.startTitleTimer
+            case GameData.TitleTimer =>
+                scene
+                    |> HUDScene.showStartButton
             case _ => scene
         }
 }
@@ -124,8 +158,10 @@ mod Game {
     // 初期状態構築
     // ========================================================================
 
-    pub def buildState(_fontAtlas: FontAtlas): GameState =
-        let timer = Timer.make(0.5) |> Timer.setOneShot(false);
+    pub def buildState(fontAtlas: FontAtlas): GameState =
+        let mobTimer = Timer.make(0.5) |> Timer.setOneShot(false);
+        let startTimer = Timer.make(2.0);
+        let scoreTimer = Timer.make(1.0) |> Timer.setOneShot(false);
         let mobPath = Path2D.screenEdgePath(screenWi(), screenHi());
         let bg = ColorRect.make(
             {x = 480.0, y = 720.0},
@@ -139,10 +175,16 @@ mod Game {
                 |> Scene.addNode("background", bgNode)
                 |> PlayerScene.addPlayer
                 |> Scene.addNode("mob_timer",
-                    EngineNode.TimerWithState(timer, GameData.MobTimer(0)))
+                    EngineNode.TimerWithState(mobTimer, GameData.MobTimer(0)))
                 |> Scene.addNode("mob_path",
-                    EngineNode.Path2DWithState(mobPath, GameData.MobPath)),
-            mobCounter = 0
+                    EngineNode.Path2DWithState(mobPath, GameData.MobPath))
+                |> Scene.addNode("start_timer",
+                    EngineNode.TimerWithState(startTimer, GameData.StartTimer))
+                |> Scene.addNode("score_timer",
+                    EngineNode.TimerWithState(scoreTimer, GameData.ScoreTimer))
+                |> HUDScene.addHUD(fontAtlas),
+            mobCounter = 0,
+            phase = GamePhase.Menu
         }
 
     // ========================================================================
@@ -164,32 +206,101 @@ mod Game {
         {x = xDir, y = yDir}
 
     // ========================================================================
+    // フェーズ遷移
+    // ========================================================================
+
+    /// Menu/GameOver → GetReady: プレイヤー表示、スコアリセット、GetReady メッセージ、BGM 再生
+    pub def newGame(state: GameState): GameState \ GameEngine.Audio =
+        AudioStreamPlayer.play("music");
+        let s0 = state#scene
+            |> Scene.removeGroup(MobScene.mobGroup())
+            |> PlayerScene.start({x = 240.0, y = 450.0});
+        let pd = PlayerScene.extractPlayerData(s0);
+        let scene = s0
+            |> PlayerScene.setPlayerData({velocity = Vec2.zero() | pd})
+            |> HUDScene.showMessage("Get Ready")
+            |> HUDScene.updateScore(0)
+            |> HUDScene.hideStartButton
+            |> Scene.mapEngineNode("start_timer" :: Nil, EngineNode.mapTimer(Timer.start));
+        { scene = scene, mobCounter = 0, phase = GamePhase.GetReady }
+
+    /// Playing → GameOver: タイマー停止、GameOver メッセージ、MessageTimer 開始、BGM 停止 + 死亡 SE 再生
+    pub def gameOver(state: GameState): GameState \ GameEngine.Audio =
+        AudioStreamPlayer.stop("music");
+        AudioStreamPlayer.play("death");
+        let scene = state#scene
+            |> Scene.mapEngineNode("mob_timer" :: Nil, EngineNode.mapTimer(Timer.stop))
+            |> Scene.mapEngineNode("score_timer" :: Nil, EngineNode.mapTimer(Timer.stop))
+            |> HUDScene.showMessage("Game Over")
+            |> HUDScene.hideStartButton
+            |> HUDScene.startMessageTimer;
+        { scene = scene, phase = GamePhase.GameOver | state }
+
+    // ========================================================================
+    // 共通パイプライン
+    // ========================================================================
+
+    /// エンジン更新パイプライン（process → physics → collision → screen → timers）
+    def engineUpdate(dt: Float64, scene: Scene[GameData]): Scene[GameData] \ GameEngine.Game =
+        (GameEngine.process(dt, false)
+        >> GameEngine.physicsProcess(dt, false, PhysicsStep.defaultGravity())
+        >> GameEngine.emitCollision
+        >> GameEngine.emitScreenNotify(screenWidth = screenWi(), screenHeight = screenHi())
+        >> GameEngine.emitTimers)(scene)
+
+    /// 入力読み取り + エンジン更新
+    def inputAndUpdate(dt: Float64, scene: Scene[GameData]): Scene[GameData] \ GameEngine.Game =
+        let dir = readInputDirection();
+        engineUpdate(dt, PlayerScene.applyInput(dir)(scene))
+
+    // ========================================================================
     // メインループ
     // ========================================================================
 
-    pub def start(fontAtlas: FontAtlas): Unit \ GameEngine.Game =
+    pub def start(fontAtlas: FontAtlas): Unit \ GameEngine.Game + GameEngine.Audio =
         let state = buildState(fontAtlas);
-        let startedState: GameState = {
-            scene = PlayerScene.start({x = 240.0, y = 360.0}, state#scene)
-            | state };
-        gameLoop(fontAtlas, startedState)
+        gameLoop(fontAtlas, state)
 
-    def gameLoop(fontAtlas: FontAtlas, state: GameState): Unit \ GameEngine.Game =
+    def gameLoop(fontAtlas: FontAtlas, state: GameState): Unit \ GameEngine.Game + GameEngine.Audio =
         if (GameEngine.Game.shouldClose()) ()
         else if (GameEngine.Game.isKeyPressed(GameEngine.Key.Escape)) ()
         else {
             let dt = GameEngine.Game.getDeltaTime();
-            let dir = readInputDirection();
-            let updateScene =
-                PlayerScene.applyInput(dir)
-                >> GameEngine.process(dt, false)
-                >> GameEngine.physicsProcess(dt, false,  PhysicsStep.defaultGravity())
-                >> GameEngine.emitCollision
-                >> GameEngine.emitScreenNotify(screenWidth = screenWi(), screenHeight = screenHi())
-                >> GameEngine.emitTimers;
-            let updatedScene = updateScene(state#scene);
-            GameEngine.render(updatedScene);
-            { scene = updatedScene | state }
-                |> gameLoop(fontAtlas)
+            let nextState: GameState = match state#phase {
+                case GamePhase.Menu =>
+                    let updatedScene = ButtonEvent.updateButtons(state#scene);
+                    let enterPressed = GameEngine.Game.isKeyPressed(GameEngine.Key.Enter);
+                    let startPressed = HUDScene.isStartButtonJustPressed(updatedScene) or enterPressed;
+                    if (startPressed)
+                        newGame({ scene = HUDScene.clearStartButtonPress(updatedScene) | state })
+                    else
+                        { scene = updatedScene | state }
+                case GamePhase.GetReady =>
+                    let updatedScene = inputAndUpdate(dt, state#scene);
+                    let nextPhase = match Scene.getEngineNode("mob_timer" :: Nil, updatedScene) {
+                        case Some(EngineNode.TimerWithState(timer, _)) =>
+                            if (Timer.isRunning(timer)) GamePhase.Playing else GamePhase.GetReady
+                        case _ => GamePhase.GetReady
+                    };
+                    { scene = updatedScene, phase = nextPhase | state }
+                case GamePhase.Playing =>
+                    let updatedScene = inputAndUpdate(dt, state#scene);
+                    match Scene.getEngineNode("player" :: Nil, updatedScene) {
+                        case Some(en) =>
+                            if (not CanvasItem.isVisible(en))
+                                gameOver({ scene = updatedScene | state })
+                            else
+                                { scene = updatedScene | state }
+                        case None => { scene = updatedScene | state }
+                    }
+                case GamePhase.GameOver =>
+                    let updatedScene = engineUpdate(dt, state#scene);
+                    if (HUDScene.isStartButtonVisible(updatedScene))
+                        { scene = updatedScene, phase = GamePhase.Menu | state }
+                    else
+                        { scene = updatedScene | state }
+            };
+            GameEngine.render(nextState#scene);
+            gameLoop(fontAtlas, nextState)
         }
 }

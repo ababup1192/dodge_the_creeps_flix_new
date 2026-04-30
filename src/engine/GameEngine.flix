@@ -11,6 +11,13 @@ mod GameEngine {
     /// フォントアセットのマニフェストエントリ
     pub type alias FontEntry = { name = String, path = String, fontSize = Float64 }
 
+    /// サウンドアセットのマニフェストエントリ
+    /// looping = true でループ再生する
+    pub type alias AudioEntry = { name = String, path = String, looping = Bool }
+
+    /// サウンドの論理名 → OpenAL ソース ID
+    pub type alias AudioRegistry = Map[String, Int32]
+
     /// テクスチャ情報: GPU ハンドル ID + 元画像サイズ
     pub type alias TextureInfo = { id = Int32, width = Float64, height = Float64 }
 
@@ -24,6 +31,7 @@ mod GameEngine {
         title = String,
         textureManifest = List[TextureEntry],
         fontManifest = List[FontEntry],
+        soundManifest = List[AudioEntry],
         clearColor = Color
     }
 
@@ -61,14 +69,31 @@ mod GameEngine {
         case Escape
     }
 
-    /// ゲームエフェクト: 描画・ウィンドウ制御・時間取得・キー入力・フォント・ビューポート
+    /// マウスボタン
+    pub enum MouseButton with Eq, Order, ToString {
+        case Left
+        case Right
+        case Middle
+    }
+
+    /// ゲームエフェクト: 描画・ウィンドウ制御・時間取得・キー入力・マウス入力・フォント・ビューポート
     pub eff Game {
         def render(drawables: List[Drawable]): Unit
         def shouldClose(): Bool
         def getDeltaTime(): Float64
         def isKeyPressed(key: Key): Bool
+        def getMousePosition(): Vec2.Vec2
+        def isMouseButtonPressed(button: MouseButton): Bool
         def getFontAtlas(name: String): FontAtlas
         def getViewportRect(): Rect2.Rect2
+    }
+
+    /// オーディオエフェクト: サウンドの再生・停止
+    pub eff Audio {
+        /// 指定した名前のサウンドを先頭から再生する
+        def playAudio(name: String): Unit
+        /// 指定した名前のサウンドを停止する
+        def stopAudio(name: String): Unit
     }
 
     // ========================================================================
@@ -109,6 +134,11 @@ mod GameEngine {
     pub def emitTimers(scene: Scene[s]): Scene[s]
             with TimerEvent.TimerHandler[s] =
         TimerEvent.handleTimeouts(scene)
+
+    /// ボタンプレスを検出し ButtonHandler で応答する
+    pub def emitButtons(scene: Scene[s]): Scene[s] \ Game
+            with ButtonEvent.ButtonHandler[s] =
+        ButtonEvent.handleButtons(scene)
 
     /// シーンを描画する
     pub def render(scene: Scene[s]): Unit \ Game =

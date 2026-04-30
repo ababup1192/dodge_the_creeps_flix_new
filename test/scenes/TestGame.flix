@@ -10,6 +10,8 @@ def withMockEngine(f: Unit -> a \ ef + GameEngine.Game): a \ ef =
         def shouldClose(k) = k(false)
         def getDeltaTime(k) = k(0.016)
         def isKeyPressed(_, k) = k(false)
+        def getMousePosition(k) = k(Vec2.zero())
+        def isMouseButtonPressed(_, k) = k(false)
         def getFontAtlas(_, k) = k(testFontAtlas())
         def getViewportRect(k) = k(Rect2.fromSize({x = 480.0, y = 720.0}))
     }
@@ -21,8 +23,21 @@ def withKeysPressed(keys: Set[GameEngine.Key], f: Unit -> a \ ef + GameEngine.Ga
         def shouldClose(k) = k(false)
         def getDeltaTime(k) = k(0.016)
         def isKeyPressed(key, k) = k(Set.memberOf(key, keys))
+        def getMousePosition(k) = k(Vec2.zero())
+        def isMouseButtonPressed(_, k) = k(false)
         def getFontAtlas(_, k) = k(testFontAtlas())
         def getViewportRect(k) = k(Rect2.fromSize({x = 480.0, y = 720.0}))
+    }
+
+/// Audio エフェクトの記録用ハンドラ（playAudio/stopAudio の呼び出しを記録する）
+def recordAudio(f: Unit -> a \ GameEngine.Audio): (a, List[String]) =
+    run { (f(), Nil) } with handler GameEngine.Audio {
+        def playAudio(name, k) =
+            let (result, rest) = k(());
+            (result, "play:${name}" :: rest)
+        def stopAudio(name, k) =
+            let (result, rest) = k(());
+            (result, "stop:${name}" :: rest)
     }
 
 /// テスト用のダミー FontAtlas（空のグリフマップ）
@@ -50,31 +65,32 @@ def vecToTuple(v: Vec2.Vec2): (Float64, Float64) = (v#x, v#y)
 // buildState: ノード数・構造
 // ========================================================================
 
-/// シーンにはプレイヤー + Area2D + Trail + mob_timer + mob_path + background = 6 ノード
+/// シーンには player(+area+trail) + background + mob_timer + mob_path + start_timer + score_timer
+///   + hud(+score_label+message_label+start_button+message_timer+title_timer) = 14 ノード
 @Test
 def testBuildSceneNodeCount(): Unit \ Assert =
-    Assert.assertEq(expected = 6, Scene.nodeCount(testScene()))
+    Assert.assertEq(expected = 14, Scene.nodeCount(testScene()))
 
-/// ルートノードは 4 つ（background + player + mob_timer + mob_path）
+/// ルートノードは 7 つ（background + player + mob_timer + mob_path + start_timer + score_timer + hud）
 @Test
 def testBuildSceneRootCount(): Unit \ Assert =
-    Assert.assertEq(expected = 4, Map.size(Scene.states(testScene())))
+    Assert.assertEq(expected = 7, Map.size(Scene.states(testScene())))
 
 // ========================================================================
 // buildState: プレイヤー配置
 // ========================================================================
 
-/// プレイヤーの初期位置が画面中央 (240, 360)
+/// プレイヤーの初期位置 (240, 450)（Godot 版準拠）
 @Test
 def testPlayerInitialPosition(): Unit \ Assert =
     let pos = Scene.globalPosition("player", testScene());
-    Assert.assertEq(expected = (240.0, 360.0), vecToTuple(pos))
+    Assert.assertEq(expected = (240.0, 450.0), vecToTuple(pos))
 
-/// プレイヤーは可視状態
+/// プレイヤーは初期非表示（Menu フェーズ）
 @Test
-def testPlayerIsVisible(): Unit \ Assert =
+def testPlayerIsHidden(): Unit \ Assert =
     match Scene.getEngineNode("player" :: Nil, testScene()) {
-        case Some(engineNode) => Assert.assertTrue(CanvasItem.isVisible(engineNode))
+        case Some(engineNode) => Assert.assertFalse(CanvasItem.isVisible(engineNode))
         case None => bug!("player not found")
     }
 
@@ -273,13 +289,13 @@ def testPlayerProcessMoves(): Unit \ Assert =
                 case other => other
             });
     let pos = withMockEngine(() -> scene |> Scene.processAll(0.1, false)) |> Scene.globalPosition("player");
-    Assert.assertEq(expected = (280.0, 360.0), vecToTuple(pos))
+    Assert.assertEq(expected = (280.0, 450.0), vecToTuple(pos))
 
 /// 速度ゼロのとき process で移動しない
 @Test
 def testPlayerProcessStays(): Unit \ Assert =
     let pos = withMockEngine(() -> testReadyScene() |> Scene.processAll(0.1, false)) |> Scene.globalPosition("player");
-    Assert.assertEq(expected = (240.0, 360.0), vecToTuple(pos))
+    Assert.assertEq(expected = (240.0, 450.0), vecToTuple(pos))
 
 /// 画面右端でクランプされる
 @Test
@@ -292,7 +308,7 @@ def testPlayerClampRight(): Unit \ Assert =
                 case other => other
             });
     let pos = withMockEngine(() -> scene |> Scene.processAll(1.0, false)) |> Scene.globalPosition("player");
-    Assert.assertEq(expected = (480.0, 360.0), vecToTuple(pos))
+    Assert.assertEq(expected = (480.0, 450.0), vecToTuple(pos))
 
 /// 画面左端でクランプされる
 @Test
@@ -305,7 +321,7 @@ def testPlayerClampLeft(): Unit \ Assert =
                 case other => other
             });
     let pos = withMockEngine(() -> scene |> Scene.processAll(1.0, false)) |> Scene.globalPosition("player");
-    Assert.assertEq(expected = (0.0, 360.0), vecToTuple(pos))
+    Assert.assertEq(expected = (0.0, 450.0), vecToTuple(pos))
 
 // ========================================================================
 // setPlayerAnimation: アニメーション切り替え
@@ -354,12 +370,12 @@ def testReadySetsScreenSize(): Unit \ Assert =
 // ready → hide / start → show ライフサイクル
 // ========================================================================
 
-/// ready 後もプレイヤーが表示状態であること（hide はスタート画面実装時に復活）
+/// ready 後もプレイヤーが非表示であること（Menu フェーズ）
 @Test
-def testReadyKeepsPlayerVisible(): Unit \ Assert =
+def testReadyKeepsPlayerHidden(): Unit \ Assert =
     let scene = testReadyScene();
     match Scene.getEngineNode("player" :: Nil, scene) {
-        case Some(engineNode) => Assert.assertTrue(CanvasItem.isVisible(engineNode))
+        case Some(engineNode) => Assert.assertFalse(CanvasItem.isVisible(engineNode))
         case None => bug!("player not found")
     }
 
@@ -400,3 +416,325 @@ def testPlayerAreaChildState(): Unit \ Assert =
         case Some(GameData.PlayerArea) => Assert.assertTrue(true)
         case _ => bug!("player area state mismatch")
     }
+
+// ========================================================================
+// 衝突: プレイヤーとモブの衝突で hidden になる
+// ========================================================================
+
+/// プレイヤーとモブが同じ位置にいるとき emitCollision でプレイヤーが hidden になる
+@Test
+def testPlayerHiddenOnMobCollision(): Unit \ Assert =
+    let scene = testReadyScene()
+        |> PlayerScene.start({x = 240.0, y = 450.0})
+        |> MobScene.spawnMob("mob_test", {x = 240.0, y = 450.0}, 99);
+    // プレイヤーが表示されていることを事前確認
+    match Scene.getEngineNode("player" :: Nil, scene) {
+        case Some(en) => Assert.assertTrue(CanvasItem.isVisible(en))
+        case None => bug!("player not found before collision")
+    };
+    // 衝突検出を実行
+    let collided = GameEngine.emitCollision(scene);
+    // プレイヤーが非表示になっていること
+    match Scene.getEngineNode("player" :: Nil, collided) {
+        case Some(en) => Assert.assertFalse(CanvasItem.isVisible(en))
+        case None => bug!("player not found after collision")
+    }
+
+/// フルパイプライン (process >> physicsProcess >> emitCollision) でプレイヤーが hidden になる
+@Test
+def testPlayerHiddenFullPipeline(): Unit \ Assert =
+    let scene = withMockEngine(() -> {
+        let s0 = testScene()
+            |> PlayerScene.start({x = 240.0, y = 450.0})
+            |> MobScene.spawnMob("mob_test", {x = 240.0, y = 450.0}, 99);
+        let pipeline =
+            GameEngine.process(0.016, false)
+            >> GameEngine.physicsProcess(0.016, false, PhysicsStep.defaultGravity())
+            >> GameEngine.emitCollision
+            >> GameEngine.emitScreenNotify(screenWidth = Game.screenWi(), screenHeight = Game.screenHi())
+            >> GameEngine.emitTimers;
+        pipeline(s0)
+    });
+    match Scene.getEngineNode("player" :: Nil, scene) {
+        case Some(en) => Assert.assertFalse(CanvasItem.isVisible(en))
+        case None => bug!("player not found")
+    }
+
+/// detectOverlaps でプレイヤーとモブの重なりが検出される
+@Test
+def testDetectOverlapsPlayerMob(): Unit \ Assert =
+    let scene = testReadyScene()
+        |> PlayerScene.start({x = 240.0, y = 450.0})
+        |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 99);
+    let overlaps = AreaEvent.detectOverlaps(scene);
+    Assert.assertTrue(not List.isEmpty(overlaps))
+
+// ========================================================================
+// Start ボタン: 座標・サイズ・配置
+// ========================================================================
+
+/// HUD CanvasLayer が存在し、状態が HUDLayer であること
+@Test
+def testHUDCanvasLayerExists(): Unit \ Assert =
+    match Scene.getState(HUDScene.hudName() :: Nil, testScene()) {
+        case Some(GameData.HUDLayer) => Assert.assertTrue(true)
+        case _ => bug!("hud not found or wrong state")
+    }
+
+/// スタートボタンが存在し、状態が StartButton であること
+@Test
+def testStartButtonExists(): Unit \ Assert =
+    match Scene.getState(HUDScene.startButtonPath(), testScene()) {
+        case Some(GameData.StartButton) => Assert.assertTrue(true)
+        case _ => bug!("start_button not found or wrong state")
+    }
+
+/// スタートボタンの位置
+@Test
+def testStartButtonPosition(): Unit \ Assert =
+    let pos = Scene.globalPositionAt(HUDScene.startButtonPath(), testScene());
+    Assert.assertEq(expected = (150.0, 520.0), vecToTuple(pos))
+
+/// スタートボタンのサイズ
+@Test
+def testStartButtonSize(): Unit \ Assert =
+    match Scene.getEngineNode(HUDScene.startButtonPath(), testScene()) {
+        case Some(EngineNode.ButtonWithState(btn, _)) =>
+            let size = Button.getSize(btn);
+            Assert.assertEq(expected = (180.0, 100.0), vecToTuple(size))
+        case _ => bug!("start_button not found")
+    }
+
+/// スタートボタンの水平中心が画面中央 (240) に一致すること
+@Test
+def testStartButtonCenteredHorizontally(): Unit \ Assert =
+    match Scene.getEngineNode(HUDScene.startButtonPath(), testScene()) {
+        case Some(EngineNode.ButtonWithState(btn, _)) =>
+            let pos = Scene.globalPositionAt(HUDScene.startButtonPath(), testScene());
+            let size = Button.getSize(btn);
+            let centerX = pos#x + size#x / 2.0;
+            Assert.assertEq(expected = 240.0, centerX)
+        case _ => bug!("start_button not found")
+    }
+
+/// メッセージラベルの位置（センタリング基準点）
+@Test
+def testMessageLabelPosition(): Unit \ Assert =
+    let pos = Scene.globalPositionAt(HUDScene.messageLabelPath(), testScene());
+    Assert.assertEq(expected = (240.0, 320.0), vecToTuple(pos))
+
+/// メッセージラベルの初期テキストが "Dodge the\nCreeps" であること
+@Test
+def testMessageLabelInitialText(): Unit \ Assert =
+    match Scene.getEngineNode(HUDScene.messageLabelPath(), testScene()) {
+        case Some(EngineNode.Label2DWithState(label, _)) =>
+            Assert.assertEq(expected = "Dodge the\nCreeps", Label2D.getText(label))
+        case _ => bug!("message_label not found")
+    }
+
+/// メッセージラベルとスタートボタンの水平中心が揃っていること
+@Test
+def testLabelAndButtonAlignedHorizontally(): Unit \ Assert =
+    let labelPos = Scene.globalPositionAt(HUDScene.messageLabelPath(), testScene());
+    let labelCenterX = labelPos#x;  // centered=true なので position.x が中心
+    match Scene.getEngineNode(HUDScene.startButtonPath(), testScene()) {
+        case Some(EngineNode.ButtonWithState(btn, _)) =>
+            let btnPos = Scene.globalPositionAt(HUDScene.startButtonPath(), testScene());
+            let btnSize = Button.getSize(btn);
+            let btnCenterX = btnPos#x + btnSize#x / 2.0;
+            Assert.assertEq(expected = labelCenterX, btnCenterX)
+        case _ => bug!("start_button not found")
+    }
+
+/// スタートボタンがメッセージラベルの下に配置されていること
+@Test
+def testStartButtonBelowMessageLabel(): Unit \ Assert =
+    let labelPos = Scene.globalPositionAt(HUDScene.messageLabelPath(), testScene());
+    let btnPos = Scene.globalPositionAt(HUDScene.startButtonPath(), testScene());
+    Assert.assertTrue(btnPos#y > labelPos#y)
+
+/// スタートボタンが初期表示状態であること（Menu フェーズ）
+@Test
+def testStartButtonVisibleOnMenu(): Unit \ Assert =
+    match Scene.getEngineNode(HUDScene.startButtonPath(), testScene()) {
+        case Some(en) => Assert.assertTrue(CanvasItem.isVisible(en))
+        case None => bug!("start_button not found")
+    }
+
+/// ScoreLabel が初期表示状態であること（Godot 準拠: 常時表示）
+@Test
+def testScoreLabelVisibleInitially(): Unit \ Assert =
+    match Scene.getEngineNode(HUDScene.scoreLabelPath(), testScene()) {
+        case Some(en) => Assert.assertTrue(CanvasItem.isVisible(en))
+        case None => bug!("score_label not found")
+    }
+
+/// ScoreLabel の初期テキストが "0" であること
+@Test
+def testScoreLabelInitialText(): Unit \ Assert =
+    match Scene.getEngineNode(HUDScene.scoreLabelPath(), testScene()) {
+        case Some(EngineNode.Label2DWithState(label, _)) =>
+            Assert.assertEq(expected = "0", Label2D.getText(label))
+        case _ => bug!("score_label not found")
+    }
+
+/// MessageTimer が存在し、状態が MessageTimer であること
+@Test
+def testMessageTimerExists(): Unit \ Assert =
+    match Scene.getState(HUDScene.messageTimerPath(), testScene()) {
+        case Some(GameData.MessageTimer) => Assert.assertTrue(true)
+        case _ => bug!("message_timer not found or wrong state")
+    }
+
+/// TitleTimer が存在し、状態が TitleTimer であること
+@Test
+def testTitleTimerExists(): Unit \ Assert =
+    match Scene.getState(HUDScene.titleTimerPath(), testScene()) {
+        case Some(GameData.TitleTimer) => Assert.assertTrue(true)
+        case _ => bug!("title_timer not found or wrong state")
+    }
+
+// ========================================================================
+// パイプライン各ステップでの衝突追跡
+// ========================================================================
+
+/// applyInput 後もプレイヤーが表示されていること（衝突前）
+@Test
+def testPipelineStep1_applyInputKeepsVisible(): Unit \ Assert =
+    let scene = withMockEngine(() ->
+        Scene.processAll(0.0, false, testScene()
+            |> PlayerScene.start({x = 240.0, y = 450.0})
+            |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 99)));
+    let afterInput = PlayerScene.applyInput({x = 1.0, y = 0.0}, scene);
+    match Scene.getEngineNode("player" :: Nil, afterInput) {
+        case Some(en) => Assert.assertTrue(CanvasItem.isVisible(en))
+        case None => bug!("player not found")
+    }
+
+/// process 後もプレイヤーが表示されていること
+@Test
+def testPipelineStep2_processKeepsVisible(): Unit \ Assert =
+    let scene = withMockEngine(() ->
+        Scene.processAll(0.0, false, testScene()
+            |> PlayerScene.start({x = 240.0, y = 450.0})
+            |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 99)));
+    let afterProcess = withMockEngine(() ->
+        (PlayerScene.applyInput({x = 1.0, y = 0.0})
+        >> GameEngine.process(0.016, false))(scene));
+    match Scene.getEngineNode("player" :: Nil, afterProcess) {
+        case Some(en) => Assert.assertTrue(CanvasItem.isVisible(en))
+        case None => bug!("player not found")
+    }
+
+/// physicsProcess 後もプレイヤーが表示されていること
+@Test
+def testPipelineStep3_physicsKeepsVisible(): Unit \ Assert =
+    let scene = withMockEngine(() ->
+        Scene.processAll(0.0, false, testScene()
+            |> PlayerScene.start({x = 240.0, y = 450.0})
+            |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 99)));
+    let afterPhysics = withMockEngine(() ->
+        (PlayerScene.applyInput({x = 1.0, y = 0.0})
+        >> GameEngine.process(0.016, false)
+        >> GameEngine.physicsProcess(0.016, false, PhysicsStep.defaultGravity()))(scene));
+    match Scene.getEngineNode("player" :: Nil, afterPhysics) {
+        case Some(en) => Assert.assertTrue(CanvasItem.isVisible(en))
+        case None => bug!("player not found")
+    }
+
+/// emitCollision 後にプレイヤーが非表示になること（衝突で hide される）
+@Test
+def testPipelineStep4_collisionHidesPlayer(): Unit \ Assert =
+    let scene = withMockEngine(() ->
+        Scene.processAll(0.0, false, testScene()
+            |> PlayerScene.start({x = 240.0, y = 450.0})
+            |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 99)));
+    let afterCollision = withMockEngine(() ->
+        (PlayerScene.applyInput({x = 1.0, y = 0.0})
+        >> GameEngine.process(0.016, false)
+        >> GameEngine.physicsProcess(0.016, false, PhysicsStep.defaultGravity())
+        >> GameEngine.emitCollision)(scene));
+    match Scene.getEngineNode("player" :: Nil, afterCollision) {
+        case Some(en) => Assert.assertFalse(CanvasItem.isVisible(en))
+        case None => bug!("player not found")
+    }
+
+/// emitCollision 直前の detectOverlaps で重なりが検出されること
+@Test
+def testPipelineStep4_overlapsDetected(): Unit \ Assert =
+    let scene = withMockEngine(() ->
+        Scene.processAll(0.0, false, testScene()
+            |> PlayerScene.start({x = 240.0, y = 450.0})
+            |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 99)));
+    let afterPhysics = withMockEngine(() ->
+        (PlayerScene.applyInput({x = 1.0, y = 0.0})
+        >> GameEngine.process(0.016, false)
+        >> GameEngine.physicsProcess(0.016, false, PhysicsStep.defaultGravity()))(scene));
+    let overlaps = AreaEvent.detectOverlaps(afterPhysics);
+    Assert.assertTrue(not List.isEmpty(overlaps))
+
+/// 完全パイプライン後もプレイヤーが非表示のままであること
+@Test
+def testPipelineStep5_fullPipelineKeepsHidden(): Unit \ Assert =
+    let scene = withMockEngine(() ->
+        Scene.processAll(0.0, false, testScene()
+            |> PlayerScene.start({x = 240.0, y = 450.0})
+            |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 99)));
+    let afterFull = withMockEngine(() ->
+        (PlayerScene.applyInput({x = 1.0, y = 0.0})
+        >> GameEngine.process(0.016, false)
+        >> GameEngine.physicsProcess(0.016, false, PhysicsStep.defaultGravity())
+        >> GameEngine.emitCollision
+        >> GameEngine.emitScreenNotify(screenWidth = Game.screenWi(), screenHeight = Game.screenHi())
+        >> GameEngine.emitTimers)(scene));
+    match Scene.getEngineNode("player" :: Nil, afterFull) {
+        case Some(en) => Assert.assertFalse(CanvasItem.isVisible(en))
+        case None => bug!("player not found")
+    }
+
+/// 2フレーム目: GameOver フェーズの engineUpdate 後もプレイヤーが非表示のままであること
+@Test
+def testPipelineStep6_gameOverProcessKeepsHidden(): Unit \ Assert =
+    let scene = withMockEngine(() ->
+        Scene.processAll(0.0, false, testScene()
+            |> PlayerScene.start({x = 240.0, y = 450.0})
+            |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 99)));
+    // Frame 1: collision hides player
+    let afterFrame1 = withMockEngine(() ->
+        (PlayerScene.applyInput({x = 1.0, y = 0.0})
+        >> GameEngine.process(0.016, false)
+        >> GameEngine.physicsProcess(0.016, false, PhysicsStep.defaultGravity())
+        >> GameEngine.emitCollision
+        >> GameEngine.emitScreenNotify(screenWidth = Game.screenWi(), screenHeight = Game.screenHi())
+        >> GameEngine.emitTimers)(scene));
+    // Frame 2: GameOver phase — engineUpdate のみ（applyInput なし）
+    let afterFrame2 = withMockEngine(() ->
+        (GameEngine.process(0.016, false)
+        >> GameEngine.physicsProcess(0.016, false, PhysicsStep.defaultGravity())
+        >> GameEngine.emitCollision
+        >> GameEngine.emitScreenNotify(screenWidth = Game.screenWi(), screenHeight = Game.screenHi())
+        >> GameEngine.emitTimers)(afterFrame1));
+    match Scene.getEngineNode("player" :: Nil, afterFrame2) {
+        case Some(en) => Assert.assertFalse(CanvasItem.isVisible(en))
+        case None => bug!("player not found")
+    }
+
+// ========================================================================
+// AudioStreamPlayer: オーディオエフェクト呼び出し
+// ========================================================================
+
+/// newGame で BGM が再生される
+@Test
+def testNewGamePlaysMusic(): Unit \ Assert =
+    let (_, calls) = recordAudio(() -> {
+        discard Game.newGame(testState())
+    });
+    Assert.assertEq(expected = "play:music" :: Nil, calls)
+
+/// gameOver で BGM 停止 + 死亡 SE 再生
+@Test
+def testGameOverStopsMusicAndPlaysDeath(): Unit \ Assert =
+    let (_, calls) = recordAudio(() -> {
+        discard Game.gameOver(testState())
+    });
+    Assert.assertEq(expected = "stop:music" :: "play:death" :: Nil, calls)
