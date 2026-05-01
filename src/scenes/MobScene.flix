@@ -64,7 +64,7 @@ mod MobScene {
     pub def mobName(counter: Int32): String = "mob_${counter}"
 
     // ========================================================================
-    // ready: アニメーション選択 + linearVelocity 設定（Godot _ready 準拠）
+    // Mob スポーン
     // ========================================================================
 
     /// アニメーション名に応じた FPS を返す（Godot mob.tscn 準拠: fly=3, swim=4, walk=4）
@@ -72,44 +72,28 @@ mod MobScene {
         if (animation == flyAnimation()) 3.0
         else 4.0
 
-    /// Mob の ready 処理: ランダムにアニメーション（fly/swim/walk）を選択し、
-    /// ランダムな方向・速度で linearVelocity を設定する。
+    /// 新しい Mob をシーンに追加する（Godot mob.tscn 相当）
     ///
-    /// direction は spawnMob 時に設定された direction に ±π/4 のランダム偏差を加え、
-    /// speed は 150〜250 の範囲でランダムに決定する。
-    pub def ready(path: NodePath, direction: Float64, scene: Scene[NodeTag]): Scene[NodeTag] \ Math.Random =
+    /// RigidBody2D（gravity_scale = 0） + 子 AnimatedSprite2D の構成。
+    /// direction に ±π/4 のランダム偏差を加え、速度 150〜250 でランダムに移動する。
+    pub def spawnMob(name: String, position: Vec2.Vec2, direction: Float64, counter: Int32,
+                     scene: Scene[NodeTag]): Scene[NodeTag] \ Math.Random =
         let animation = pickAnimation();
         let dirOffset = RandomUtil.randomRange(0.0 - Vec2.pi() / 4.0, Vec2.pi() / 4.0);
         let finalDir = direction + dirOffset;
         let speed = RandomUtil.randomRange(150.0, 250.0);
         let vx = Vec2.cos(finalDir) * speed;
         let vy = Vec2.sin(finalDir) * speed;
-        scene |> mapMob(path, (mobNode, counter) ->
-            ({ body = RigidBody2D.setLinearVelocity({x = vx, y = vy}, mobNode#body),
-               sprite = mobNode#sprite
-                   |> AnimatedSprite2D.play(animation)
-                   |> AnimatedSprite2D.setFps(fpsForAnimation(animation))
-                   |> Node2D.setRotation(finalDir) },
-             counter))
-
-    // ========================================================================
-    // Mob スポーン
-    // ========================================================================
-
-    /// 新しい Mob をシーンに追加する（Godot mob.tscn 相当）
-    ///
-    /// RigidBody2D（gravity_scale = 0） + 子 AnimatedSprite2D（walk デフォルト）の構成。
-    /// アニメーション選択・velocity 設定は ready で行う（Godot _ready 準拠）。
-    pub def spawnMob(name: String, position: Vec2.Vec2, counter: Int32,
-                     scene: Scene[NodeTag]): Scene[NodeTag] =
         let body = RigidBody2D.make(position, mobCollisionShape())
-            |> RigidBody2D.setGravityScale(0.0);
+            |> RigidBody2D.setGravityScale(0.0)
+            |> RigidBody2D.setLinearVelocity({x = vx, y = vy});
         let sprite = AnimatedSprite2D.make(
             mobAnimations(),
-            initialAnimation = walkAnimation(),
-            fps = 3.0,
+            initialAnimation = animation,
+            fps = fpsForAnimation(animation),
             Vec2.zero(),
-            mobScale());
+            mobScale())
+            |> Node2D.setRotation(finalDir);
         let notifier = MobScene.mobNotifier();
         scene
             |> Scene.addNode(name,

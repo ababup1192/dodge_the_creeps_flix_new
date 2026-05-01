@@ -38,24 +38,15 @@ pub type alias GameState = {
 
 instance Node[NodeTag] {
     redef ready(node: EngineNode[NodeTag],
-                path: NodePath, scene: Scene[NodeTag]): (EngineNode[NodeTag], Scene[NodeTag]) \ {GameEngine.Game, Math.Random} =
-        match node {
+                _path: NodePath, scene: Scene[NodeTag]): (EngineNode[NodeTag], Scene[NodeTag]) \ {GameEngine.Game, Math.Random} =
+        checked_ecast(match node {
             case EngineNode.AnimSprite2DWithState(sprite, NodeTag.PlayerSprite(playerData)) =>
                 let (readySprite, readyPlayerData) = PlayerScene.ready(sprite, playerData);
                 (EngineNode.AnimSprite2DWithState(readySprite,
                     NodeTag.PlayerSprite(readyPlayerData)), scene
                 )
-            case EngineNode.RigidBody2DWithState(_, NodeTag.MobBody(_)) =>
-                let rot = Node2D.getRotation(node);
-                let newScene = MobScene.ready(path, rot, scene);
-                // MobScene.ready が path のノードに linearVelocity を設定するため、
-                // 更新済みノードをシーンから取り直す（foldNodes の上書きを防ぐ）
-                match Scene.getEngineNode(path, newScene) {
-                    case Some(en) => (en, newScene)
-                    case None => (node, newScene)
-                }
             case _ => (node, scene)
-        }
+        })
 
     redef process(delta: Float64, node: EngineNode[NodeTag],
                     _path: NodePath, scene: Scene[NodeTag]): (EngineNode[NodeTag], Scene[NodeTag]) \ Math.Random =
@@ -158,11 +149,7 @@ mod Game {
         let t = Math.Random.randomFloat64();
         let sample = Path2D.sample(t, Path2D.screenEdgePath(screenWi(), screenHi()));
         let name = MobScene.mobName(counter);
-        let mobPath = name :: Nil;
-        // direction を RigidBody2D の rotation に仮保存（ready で使う）
-        MobScene.spawnMob(name, sample#position, counter, scene)
-            |> MobScene.mapMob(mobPath, (mobNode, c) ->
-                ({ body = Node2D.setRotation(sample#direction, mobNode#body) | mobNode }, c))
+        MobScene.spawnMob(name, sample#position, sample#direction, counter, scene)
 
     // ========================================================================
     // 初期状態構築

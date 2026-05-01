@@ -6,16 +6,16 @@
 
 /// spawnMob でシーンに RigidBody2D ノードが追加される
 @Test
-def testMobSceneSpawnMobAddsNode(): Unit \ Assert =
+def testMobSceneSpawnMobAddsNode(): Unit \ {Assert, Math.Random} =
     let scene = Scene.empty()
-        |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0);
+        |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0.0, 0);
     Assert.assertTrue(not Option.isEmpty(Scene.getEngineNode("mob_0" :: Nil, scene)))
 
 /// spawnMob で追加された Mob の状態が MobBody である
 @Test
-def testMobSceneSpawnMobState(): Unit \ Assert =
+def testMobSceneSpawnMobState(): Unit \ {Assert, Math.Random} =
     let scene = Scene.empty()
-        |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0);
+        |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0.0, 0);
     match Scene.getState("mob_0" :: Nil, scene) {
         case Some(NodeTag.MobBody(_)) => Assert.assertTrue(true)
         case _ => bug!("Expected MobBody")
@@ -23,17 +23,17 @@ def testMobSceneSpawnMobState(): Unit \ Assert =
 
 /// spawnMob で Mob の位置が指定座標に設定される
 @Test
-def testMobSceneSpawnMobPosition(): Unit \ Assert =
+def testMobSceneSpawnMobPosition(): Unit \ {Assert, Math.Random} =
     let scene = Scene.empty()
-        |> MobScene.spawnMob("mob_0", {x = 100.0, y = -50.0}, 0);
+        |> MobScene.spawnMob("mob_0", {x = 100.0, y = -50.0}, 0.0, 0);
     let pos = Scene.globalPosition("mob_0", scene);
     Assert.assertEq(expected = (100.0, -50.0), (pos#x, pos#y))
 
 /// spawnMob で AnimatedSprite2D 子ノードが追加される
 @Test
-def testMobSceneSpawnMobHasSpriteChild(): Unit \ Assert =
+def testMobSceneSpawnMobHasSpriteChild(): Unit \ {Assert, Math.Random} =
     let scene = Scene.empty()
-        |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0);
+        |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0.0, 0);
     match Scene.getState("mob_0" :: "sprite" :: Nil, scene) {
         case Some(NodeTag.NoTag) => Assert.assertTrue(true)
         case _ => bug!("Expected NoTag child")
@@ -41,9 +41,9 @@ def testMobSceneSpawnMobHasSpriteChild(): Unit \ Assert =
 
 /// spawnMob で生成された Mob は RigidBody2D である
 @Test
-def testMobSceneSpawnMobIsRigidBody(): Unit \ Assert =
+def testMobSceneSpawnMobIsRigidBody(): Unit \ {Assert, Math.Random} =
     let scene = Scene.empty()
-        |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0);
+        |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0.0, 0);
     match Scene.getEngineNode("mob_0" :: Nil, scene) {
         case Some(EngineNode.RigidBody2DWithState(_, _)) => Assert.assertTrue(true)
         case _ => bug!("Expected RigidBody2DWithState")
@@ -51,9 +51,9 @@ def testMobSceneSpawnMobIsRigidBody(): Unit \ Assert =
 
 /// spawnMob で ScreenNotifier2D 子ノードが追加される
 @Test
-def testMobSceneSpawnMobHasNotifierChild(): Unit \ Assert =
+def testMobSceneSpawnMobHasNotifierChild(): Unit \ {Assert, Math.Random} =
     let scene = Scene.empty()
-        |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0);
+        |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0.0, 0);
     match Scene.getEngineNode("mob_0" :: "notifier" :: Nil, scene) {
         case Some(EngineNode.ScreenNotifier2DWithState(_, NodeTag.NoTag)) =>
             Assert.assertTrue(true)
@@ -62,9 +62,9 @@ def testMobSceneSpawnMobHasNotifierChild(): Unit \ Assert =
 
 /// spawnMob で Mob が "mobs" グループに追加される
 @Test
-def testMobSceneSpawnMobInGroup(): Unit \ Assert =
+def testMobSceneSpawnMobInGroup(): Unit \ {Assert, Math.Random} =
     let scene = Scene.empty()
-        |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0);
+        |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0.0, 0);
     let paths = Scene.getNodesInGroup(MobScene.mobGroup(), scene);
     Assert.assertEq(expected = ("mob_0" :: Nil) :: Nil, paths)
 
@@ -81,23 +81,24 @@ def testMobSceneSpawnMobInGroup(): Unit \ Assert =
 ///   gravity_scale = 0 のため位置は変化しない
 ///
 @Test
-def testMobSceneGravityDisabled(): Unit \ Assert =
+def testMobSceneGravityDisabled(): Unit \ {Assert, Math.Random} =
     let scene = Scene.empty()
-        |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0)
+        |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0.0, 0)
+        |> Scene.mapEngineNode("mob_0" :: Nil,
+            EngineNode.mapRigidBody2D(RigidBody2D.setLinearVelocity(Vec2.zero())))
         |> PhysicsStep.integrate(0.5, PhysicsStep.defaultGravity());
     let pos = Scene.globalPosition("mob_0", scene);
     Assert.assertEq(expected = (240.0, -50.0), (pos#x, pos#y))
 
 // ========================================================================
-// ready: アニメーション選択（ランダム — Godot pick_random 準拠）
+// spawnMob: アニメーション選択（ランダム — Godot pick_random 準拠）
 // ========================================================================
 
-/// ready でアニメーション（fly/swim/walk）のいずれかが設定される
+/// spawnMob でアニメーション（fly/swim/walk）のいずれかが設定される
 @Test
-def testMobSceneReadyPicksValidAnimation(): Unit \ {Assert, Math.Random} =
+def testMobSceneSpawnMobPicksValidAnimation(): Unit \ {Assert, Math.Random} =
     let scene = Scene.empty()
-        |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0)
-        |> MobScene.ready("mob_0" :: Nil, 1.5708);
+        |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 1.5708, 0);
     match Scene.getEngineNode("mob_0" :: "sprite" :: Nil, scene) {
         case Some(EngineNode.AnimSprite2DWithState(sprite, _)) =>
             let anim = AnimatedSprite2D.getCurrentAnimation(sprite);
@@ -143,9 +144,9 @@ def testPath2DSampleBottomLeft(): Unit \ Assert =
 
 /// 画面内の Mob は削除されない
 @Test
-def testMobSceneKeepOnScreenMob(): Unit \ Assert =
+def testMobSceneKeepOnScreenMob(): Unit \ {Assert, Math.Random} =
     let scene = Scene.empty()
-        |> MobScene.spawnMob("mob_0", {x = 240.0, y = 360.0}, 0)
+        |> MobScene.spawnMob("mob_0", {x = 240.0, y = 360.0}, 0.0, 0)
         |> ScreenNotifyEvent.handleScreenNotify(
             screenWidth = 480, screenHeight = 720);
     Assert.assertTrue(not Option.isEmpty(Scene.getEngineNode("mob_0" :: Nil, scene)))
@@ -155,9 +156,9 @@ def testMobSceneKeepOnScreenMob(): Unit \ Assert =
 ///   Y = -50 → isOnScreen = false だが prevOnScreen にないので発火しない
 ///
 @Test
-def testMobSceneKeepSpawnedMobAboveScreen(): Unit \ Assert =
+def testMobSceneKeepSpawnedMobAboveScreen(): Unit \ {Assert, Math.Random} =
     let scene = Scene.empty()
-        |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0)
+        |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0.0, 0)
         |> ScreenNotifyEvent.handleScreenNotify(
             screenWidth = 480, screenHeight = 720);
     Assert.assertTrue(not Option.isEmpty(Scene.getEngineNode("mob_0" :: Nil, scene)))
@@ -168,10 +169,10 @@ def testMobSceneKeepSpawnedMobAboveScreen(): Unit \ Assert =
 ///   フレーム2: Y = 800 → 画面外 → onScreenExited 発火 → 削除
 ///
 @Test
-def testMobSceneRemoveExitedMob(): Unit \ Assert =
+def testMobSceneRemoveExitedMob(): Unit \ {Assert, Math.Random} =
     // フレーム1: 画面内
     let scene1 = Scene.empty()
-        |> MobScene.spawnMob("mob_0", {x = 240.0, y = 360.0}, 0)
+        |> MobScene.spawnMob("mob_0", {x = 240.0, y = 360.0}, 0.0, 0)
         |> ScreenNotifyEvent.handleScreenNotify(
             screenWidth = 480, screenHeight = 720);
     // フレーム2: 画面外に移動
@@ -182,9 +183,9 @@ def testMobSceneRemoveExitedMob(): Unit \ Assert =
 
 /// Mob 削除時にスプライト子ノードも一緒に削除される
 @Test
-def testMobSceneRemoveAlsoRemovesChildren(): Unit \ Assert =
+def testMobSceneRemoveAlsoRemovesChildren(): Unit \ {Assert, Math.Random} =
     let scene1 = Scene.empty()
-        |> MobScene.spawnMob("mob_0", {x = 240.0, y = 360.0}, 0)
+        |> MobScene.spawnMob("mob_0", {x = 240.0, y = 360.0}, 0.0, 0)
         |> ScreenNotifyEvent.handleScreenNotify(
             screenWidth = 480, screenHeight = 720);
     let scene2 = Scene.setGlobalPosition("mob_0", {x = 240.0, y = 800.0}, scene1)
@@ -194,12 +195,12 @@ def testMobSceneRemoveAlsoRemovesChildren(): Unit \ Assert =
 
 /// 複数の Mob のうち画面外に出たものだけ削除される
 @Test
-def testMobSceneRemoveOnlyExitedMobs(): Unit \ Assert =
+def testMobSceneRemoveOnlyExitedMobs(): Unit \ {Assert, Math.Random} =
     // フレーム1: 全 Mob 画面内
     let scene1 = Scene.empty()
-        |> MobScene.spawnMob("mob_0", {x = 100.0, y = 300.0}, 0)
-        |> MobScene.spawnMob("mob_1", {x = 200.0, y = 400.0}, 1)
-        |> MobScene.spawnMob("mob_2", {x = 300.0, y = 500.0}, 2)
+        |> MobScene.spawnMob("mob_0", {x = 100.0, y = 300.0}, 0.0, 0)
+        |> MobScene.spawnMob("mob_1", {x = 200.0, y = 400.0}, 0.0, 1)
+        |> MobScene.spawnMob("mob_2", {x = 300.0, y = 500.0}, 0.0, 2)
         |> ScreenNotifyEvent.handleScreenNotify(
             screenWidth = 480, screenHeight = 720);
     // フレーム2: mob_1 だけ画面外に移動
@@ -223,10 +224,10 @@ def testMobSceneRemoveOnlyExitedMobs(): Unit \ Assert =
 ///   1秒後: 位置 = 360 + 980 = 1340 → 画面外
 ///
 @Test
-def testMobSceneIntegrationMoveAndRemove(): Unit \ Assert =
+def testMobSceneIntegrationMoveAndRemove(): Unit \ {Assert, Math.Random} =
     // フレーム1: 画面内 → prevOnScreen に登録
     let scene1 = Scene.empty()
-        |> MobScene.spawnMob("mob_0", {x = 240.0, y = 360.0}, 0)
+        |> MobScene.spawnMob("mob_0", {x = 240.0, y = 360.0}, 0.0, 0)
         |> Scene.mapEngineNode("mob_0" :: Nil,
             EngineNode.mapRigidBody2D(RigidBody2D.setLinearVelocity({x = 0.0, y = 980.0})))
         |> ScreenNotifyEvent.handleScreenNotify(
@@ -245,10 +246,10 @@ def testMobSceneIntegrationMoveAndRemove(): Unit \ Assert =
 ///   0.1秒後: 位置 = 360 + 100*0.1 = 370 → 画面内 → 保持
 ///
 @Test
-def testMobSceneIntegrationMoveButStillOnScreen(): Unit \ Assert =
+def testMobSceneIntegrationMoveButStillOnScreen(): Unit \ {Assert, Math.Random} =
     // フレーム1: 画面内
     let scene1 = Scene.empty()
-        |> MobScene.spawnMob("mob_0", {x = 240.0, y = 360.0}, 0)
+        |> MobScene.spawnMob("mob_0", {x = 240.0, y = 360.0}, 0.0, 0)
         |> Scene.mapEngineNode("mob_0" :: Nil,
             EngineNode.mapRigidBody2D(RigidBody2D.setLinearVelocity({x = 0.0, y = 100.0})))
         |> ScreenNotifyEvent.handleScreenNotify(

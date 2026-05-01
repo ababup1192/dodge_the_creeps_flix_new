@@ -431,10 +431,10 @@ def testPlayerAreaChildState(): Unit \ Assert =
 
 /// プレイヤーとモブが同じ位置にいるとき emitCollision でプレイヤーが hidden になる
 @Test
-def testPlayerHiddenOnMobCollision(): Unit \ Assert =
+def testPlayerHiddenOnMobCollision(): Unit \ {Assert, Math.Random} =
     let scene = testReadyScene()
         |> PlayerScene.start({x = 240.0, y = 450.0})
-        |> MobScene.spawnMob("mob_test", {x = 240.0, y = 450.0}, 99);
+        |> MobScene.spawnMob("mob_test", {x = 240.0, y = 450.0}, 0.0, 99);
     // プレイヤーが表示されていることを事前確認
     match Scene.getEngineNode("player" :: Nil, scene) {
         case Some(en) => Assert.assertTrue(CanvasItem.isVisible(en))
@@ -454,7 +454,7 @@ def testPlayerHiddenFullPipeline(): Unit \ Assert =
     let scene = withMockEngine(() -> {
         let s0 = testScene()
             |> PlayerScene.start({x = 240.0, y = 450.0})
-            |> MobScene.spawnMob("mob_test", {x = 240.0, y = 450.0}, 99);
+            |> MobScene.spawnMob("mob_test", {x = 240.0, y = 450.0}, 0.0, 99);
         let pipeline =
             GameEngine.process(0.016, false)
             >> GameEngine.physicsProcess(0.016, false, PhysicsStep.defaultGravity())
@@ -470,10 +470,10 @@ def testPlayerHiddenFullPipeline(): Unit \ Assert =
 
 /// detectOverlaps でプレイヤーとモブの重なりが検出される
 @Test
-def testDetectOverlapsPlayerMob(): Unit \ Assert =
+def testDetectOverlapsPlayerMob(): Unit \ {Assert, Math.Random} =
     let scene = testReadyScene()
         |> PlayerScene.start({x = 240.0, y = 450.0})
-        |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 99);
+        |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 0.0, 99);
     let overlaps = AreaEvent.detectOverlaps(scene);
     Assert.assertTrue(not List.isEmpty(overlaps))
 
@@ -612,7 +612,7 @@ def testPipelineStep1_applyInputKeepsVisible(): Unit \ Assert =
     let scene = withMockEngine(() ->
         Scene.processAll(0.0, false, testScene()
             |> PlayerScene.start({x = 240.0, y = 450.0})
-            |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 99)));
+            |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 0.0, 99)));
     let afterInput = PlayerScene.applyInput({x = 1.0, y = 0.0}, scene);
     match Scene.getEngineNode("player" :: Nil, afterInput) {
         case Some(en) => Assert.assertTrue(CanvasItem.isVisible(en))
@@ -625,7 +625,7 @@ def testPipelineStep2_processKeepsVisible(): Unit \ Assert =
     let scene = withMockEngine(() ->
         Scene.processAll(0.0, false, testScene()
             |> PlayerScene.start({x = 240.0, y = 450.0})
-            |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 99)));
+            |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 0.0, 99)));
     let afterProcess = withMockEngine(() ->
         (PlayerScene.applyInput({x = 1.0, y = 0.0})
         >> GameEngine.process(0.016, false))(scene));
@@ -640,7 +640,7 @@ def testPipelineStep3_physicsKeepsVisible(): Unit \ Assert =
     let scene = withMockEngine(() ->
         Scene.processAll(0.0, false, testScene()
             |> PlayerScene.start({x = 240.0, y = 450.0})
-            |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 99)));
+            |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 0.0, 99)));
     let afterPhysics = withMockEngine(() ->
         (PlayerScene.applyInput({x = 1.0, y = 0.0})
         >> GameEngine.process(0.016, false)
@@ -656,7 +656,7 @@ def testPipelineStep4_collisionHidesPlayer(): Unit \ Assert =
     let scene = withMockEngine(() ->
         Scene.processAll(0.0, false, testScene()
             |> PlayerScene.start({x = 240.0, y = 450.0})
-            |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 99)));
+            |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 0.0, 99)));
     let afterCollision = withMockEngine(() ->
         (PlayerScene.applyInput({x = 1.0, y = 0.0})
         >> GameEngine.process(0.016, false)
@@ -673,7 +673,7 @@ def testPipelineStep4_overlapsDetected(): Unit \ Assert =
     let scene = withMockEngine(() ->
         Scene.processAll(0.0, false, testScene()
             |> PlayerScene.start({x = 240.0, y = 450.0})
-            |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 99)));
+            |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 0.0, 99)));
     let afterPhysics = withMockEngine(() ->
         (PlayerScene.applyInput({x = 1.0, y = 0.0})
         >> GameEngine.process(0.016, false)
@@ -687,7 +687,7 @@ def testPipelineStep5_fullPipelineKeepsHidden(): Unit \ Assert =
     let scene = withMockEngine(() ->
         Scene.processAll(0.0, false, testScene()
             |> PlayerScene.start({x = 240.0, y = 450.0})
-            |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 99)));
+            |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 0.0, 99)));
     let afterFull = withMockEngine(() ->
         (PlayerScene.applyInput({x = 1.0, y = 0.0})
         >> GameEngine.process(0.016, false)
@@ -706,7 +706,7 @@ def testPipelineStep6_gameOverProcessKeepsHidden(): Unit \ Assert =
     let scene = withMockEngine(() ->
         Scene.processAll(0.0, false, testScene()
             |> PlayerScene.start({x = 240.0, y = 450.0})
-            |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 99)));
+            |> MobScene.spawnMob("mob_test", {x = 260.0, y = 450.0}, 0.0, 99)));
     // Frame 1: collision hides player
     let afterFrame1 = withMockEngine(() ->
         (PlayerScene.applyInput({x = 1.0, y = 0.0})
