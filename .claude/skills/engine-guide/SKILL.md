@@ -1,6 +1,6 @@
 ---
 name: engine-guide
-description: "ゲームエンジン（Scene[s], EngineNode[s], GameEngine）のコードを書く前に参照するお作法ガイド。GameData設計、trait実装、衝突応答、動的スポーンを含む"
+description: "ゲームエンジン（Scene[s], EngineNode[s], GameEngine）のコードを書く前に参照するお作法ガイド。NodeTag設計、trait実装、衝突応答、動的スポーンを含む"
 user-invocable: false
 ---
 
@@ -11,7 +11,7 @@ user-invocable: false
 | ファイル | 責務 |
 |---|---|
 | `src/Main.flix` | EngineConfig + LwjglLayer 起動のみ |
-| `src/scenes/Game.flix` | GameData enum, trait instance, mod Game（buildState・gameLoop） |
+| `src/scenes/Game.flix` | NodeTag enum, trait instance, mod Game（buildState・gameLoop） |
 | `src/scenes/XxxScene.flix` | 個別シーンの構築・更新（scene-pattern 参照） |
 | `src/engine/**` | エンジン層（通常は変更不要） |
 
@@ -45,26 +45,26 @@ def main(): Unit \ IO =
 
 ```
 // 1. GamePhase enum
-// 2. GameData enum
+// 2. NodeTag enum
 // 3. GameState type alias
-// 4. Node[GameData] instance
-// 5. AreaHandler[GameData] instance
-// 6. ScreenNotifyHandler[GameData] instance（必要な場合）
-// 7. TimerEvent.TimerHandler[GameData] instance（必要な場合）
+// 4. Node[NodeTag] instance
+// 5. AreaHandler[NodeTag] instance
+// 6. ScreenNotifyHandler[NodeTag] instance（必要な場合）
+// 7. TimerEvent.TimerHandler[NodeTag] instance（必要な場合）
 // 8. mod Game { buildState, gameLoop, フェーズ遷移, ヘルパー }
 ```
 
-### GameData enum
+### NodeTag enum
 
 ノード固有の状態データ。エンジン型（Area2D 等）は含めない（それは EngineNode の役割）:
 
 ```flix
-pub enum GameData {
+pub enum NodeTag {
     case XxxState(XxxScene.XxxNode, XxxScene.XxxData)  // 親: XxxNode + 状態を持つ
     case XxxArea                                        // 子: 識別のみ（データなし）
     case YyyData(Int32)                                 // 親: 軽量な状態
     case SpawnTimer(Int32)                              // タイマー + カウンタ
-    case Marker                                         // 汎用: 状態なし
+    case NoTag                                         // 汎用: 状態なし
 }
 ```
 
@@ -73,7 +73,7 @@ pub enum GameData {
 scene とゲーム全体の状態を 1 レコードにまとめる:
 
 ```flix
-pub type alias GameState = { scene = Scene[GameData], phase = GamePhase, score = Int32 }
+pub type alias GameState = { scene = Scene[NodeTag], phase = GamePhase, score = Int32 }
 ```
 
 レコード更新: `{ scene = newScene, phase = GamePhase.GameOver | state }`
@@ -82,17 +82,17 @@ pub type alias GameState = { scene = Scene[GameData], phase = GamePhase, score =
 
 ### Node instance — XxxScene への委譲
 
-`EngineNode × GameData` の二重 match で分岐し、XxxScene の関数に委譲する:
+`EngineNode × NodeTag` の二重 match で分岐し、XxxScene の関数に委譲する:
 
 ```flix
-instance Node[GameData] {
+instance Node[NodeTag] {
     redef ready(node, path, scene) = match node {
         // 純粋スタイル: エンジン型 + データを渡し、戻り値を再ラップ
-        case EngineNode.AnimSprite2DWithState(sprite, GameData.XxxState(n, data)) =>
+        case EngineNode.AnimSprite2DWithState(sprite, NodeTag.XxxState(n, data)) =>
             let (s, d) = XxxScene.ready(sprite, data);
-            (EngineNode.AnimSprite2DWithState(s, GameData.XxxState({ sprite = s | n }, d)), scene)
+            (EngineNode.AnimSprite2DWithState(s, NodeTag.XxxState({ sprite = s | n }, d)), scene)
         // Scene スタイル: path + scene を渡し、更新済みノードを取り直す
-        case EngineNode.RigidBody2DWithState(_, GameData.YyyData(_)) =>
+        case EngineNode.RigidBody2DWithState(_, NodeTag.YyyData(_)) =>
             let newScene = YyyScene.ready(path, scene);
             match Scene.getEngineNode(path, newScene) {
                 case Some(en) => (en, newScene)
@@ -102,9 +102,9 @@ instance Node[GameData] {
     }
 
     redef process(delta, node, _path, scene) = match node {
-        case EngineNode.AnimSprite2DWithState(sprite, GameData.XxxState(n, data)) =>
+        case EngineNode.AnimSprite2DWithState(sprite, NodeTag.XxxState(n, data)) =>
             let moved = XxxScene.process(delta, sprite, data);
-            (EngineNode.AnimSprite2DWithState(moved, GameData.XxxState({ sprite = moved | n }, data)), scene)
+            (EngineNode.AnimSprite2DWithState(moved, NodeTag.XxxState({ sprite = moved | n }, data)), scene)
         case _ => (node, scene)
     }
 }
@@ -112,13 +112,13 @@ instance Node[GameData] {
 
 ### AreaHandler — 衝突応答
 
-引数は GameData の値（EngineNode ではない）。scene を XxxScene の関数で変換:
+引数は NodeTag の値（EngineNode ではない）。scene を XxxScene の関数で変換:
 
 ```flix
-instance AreaHandler[GameData] {
+instance AreaHandler[NodeTag] {
     pub def onAreaEntered(_selfPath, selfState, _otherPath, otherState, scene) =
         match (selfState, otherState) {
-            case (GameData.XxxArea, GameData.YyyData(_)) =>
+            case (NodeTag.XxxArea, NodeTag.YyyData(_)) =>
                 scene |> XxxScene.mapXxx((node, data) ->
                     ({ sprite = CanvasItem.hide(node#sprite) | node },
                      { hit = true | data }))
@@ -129,14 +129,14 @@ instance AreaHandler[GameData] {
 
 ### TimerHandler — タイマーイベント
 
-GameData バリアントで分岐。XxxScene の構築・操作関数を呼ぶ:
+NodeTag バリアントで分岐。XxxScene の構築・操作関数を呼ぶ:
 
 ```flix
-instance TimerEvent.TimerHandler[GameData] {
+instance TimerEvent.TimerHandler[NodeTag] {
     redef onTimeout(timerPath, state, scene) = match state {
-        case GameData.SpawnTimer(counter) =>
+        case NodeTag.SpawnTimer(counter) =>
             let newScene = Game.spawnFromPath(counter, scene);
-            Scene.setState(timerPath, GameData.SpawnTimer(counter + 1), newScene)
+            Scene.setState(timerPath, NodeTag.SpawnTimer(counter + 1), newScene)
         case _ => scene
     }
 }
@@ -145,9 +145,9 @@ instance TimerEvent.TimerHandler[GameData] {
 ### ScreenNotifyHandler — 画面外通知
 
 ```flix
-instance ScreenNotifyHandler[GameData] {
+instance ScreenNotifyHandler[NodeTag] {
     redef onScreenExited(path, state, scene) = match state {
-        case GameData.YyyData(_) => Scene.removeAt(path, scene)
+        case NodeTag.YyyData(_) => Scene.removeAt(path, scene)
         case _ => scene
     }
 }
@@ -164,7 +164,7 @@ pub def buildState(fontAtlas: FontAtlas): GameState =
     { scene = Scene.empty()
           |> XxxScene.addXxx
           |> YyyScene.addYyy
-          |> Scene.addNode("timer", EngineNode.TimerWithState(timer, GameData.SpawnTimer(0))),
+          |> Scene.addNode("timer", EngineNode.TimerWithState(timer, NodeTag.SpawnTimer(0))),
       phase = GamePhase.Menu, score = 0 }
 ```
 
@@ -173,7 +173,7 @@ pub def buildState(fontAtlas: FontAtlas): GameState =
 GameEngine の関数を `>>` で連結:
 
 ```flix
-def engineUpdate(dt: Float64, scene: Scene[GameData]): Scene[GameData] \ {...} =
+def engineUpdate(dt: Float64, scene: Scene[NodeTag]): Scene[NodeTag] \ {...} =
     (GameEngine.process(dt, false)
     >> GameEngine.physicsProcess(dt, false, PhysicsStep.defaultGravity())
     >> GameEngine.emitCollision
@@ -217,7 +217,7 @@ pub def newGame(state: GameState): GameState \ GameEngine.Audio =
 
 ## 注意事項
 
-- GameData にエンジン型（Area2D, Sprite2D 等）をラップしない
+- NodeTag にエンジン型（Area2D, Sprite2D 等）をラップしない
 - Main.flix にゲームロジックを書かない
 - 動的スポーンの名前はカウンタ等でユニークにする
 - 同一フレームで追加したノードの process は次フレームから

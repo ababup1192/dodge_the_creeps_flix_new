@@ -34,7 +34,7 @@ mod HUDScene {
     // ========================================================================
 
     /// CanvasLayer + 子ノード5個をシーンに追加する
-    pub def addHUD(fontAtlas: FontAtlas, scene: Scene[GameData]): Scene[GameData] =
+    pub def addHUD(fontAtlas: FontAtlas, scene: Scene[NodeTag]): Scene[NodeTag] =
         let hud = CanvasLayer.make(1);
         let scoreLabel = Label2D.make("0", fontAtlas, 60.0)
             |> Label2D.setCentered(true)
@@ -48,60 +48,60 @@ mod HUDScene {
         let titleTimer = Timer.make(1.0);
         scene
             |> Scene.addNode(hudName(),
-                EngineNode.CanvasLayerWithState(hud, GameData.Marker))
+                EngineNode.CanvasLayerWithState(hud, NodeTag.NoTag))
             |> Scene.addChild(hudName(), scoreLabelName(),
-                EngineNode.Label2DWithState(scoreLabel, GameData.ScoreLabel(0)))
+                EngineNode.Label2DWithState(scoreLabel, NodeTag.ScoreLabel(0)))
             |> Scene.addChild(hudName(), messageLabelName(),
-                EngineNode.Label2DWithState(messageLabel, GameData.Marker))
+                EngineNode.Label2DWithState(messageLabel, NodeTag.NoTag))
             |> Scene.addChild(hudName(), startButtonName(),
-                EngineNode.ButtonWithState(startButton, GameData.StartButton))
+                EngineNode.ButtonWithState(startButton, NodeTag.StartButton))
             |> Scene.addChild(hudName(), messageTimerName(),
-                EngineNode.TimerWithState(messageTimer, GameData.MessageTimer))
+                EngineNode.TimerWithState(messageTimer, NodeTag.MessageTimer))
             |> Scene.addChild(hudName(), titleTimerName(),
-                EngineNode.TimerWithState(titleTimer, GameData.TitleTimer))
+                EngineNode.TimerWithState(titleTimer, NodeTag.TitleTimer))
 
     // ========================================================================
     // HUD API（Godot HUD.gd メソッド対応）
     // ========================================================================
 
     /// message_label のテキスト変更 + 表示
-    pub def showMessage(text: String, scene: Scene[GameData]): Scene[GameData] =
+    pub def showMessage(text: String, scene: Scene[NodeTag]): Scene[NodeTag] =
         scene |> Scene.mapEngineNode(messageLabelPath(), en ->
             en |> EngineNode.mapLabel2D(Label2D.setText(text)) |> CanvasItem.show)
 
     /// message_label 非表示
-    pub def hideMessage(scene: Scene[GameData]): Scene[GameData] =
+    pub def hideMessage(scene: Scene[NodeTag]): Scene[NodeTag] =
         scene |> Scene.mapEngineNode(messageLabelPath(), en -> CanvasItem.setVisible(false, en))
 
     /// score_label のテキストと ScoreLabel 状態を更新する
-    pub def updateScore(score: Int32, scene: Scene[GameData]): Scene[GameData] =
+    pub def updateScore(score: Int32, scene: Scene[NodeTag]): Scene[NodeTag] =
         scene
             |> Scene.mapEngineNode(scoreLabelPath(),
                 EngineNode.mapLabel2D(Label2D.setText(Int32.toString(score))))
-            |> Scene.setState(scoreLabelPath(), GameData.ScoreLabel(score))
+            |> Scene.setState(scoreLabelPath(), NodeTag.ScoreLabel(score))
 
     /// スコアを 1 加算し、ラベルを更新する（ScoreTimer タイムアウト時に呼ばれる）
-    pub def incrementScore(scene: Scene[GameData]): Scene[GameData] =
+    pub def incrementScore(scene: Scene[NodeTag]): Scene[NodeTag] =
         let current = match Scene.getState(scoreLabelPath(), scene) {
-            case Some(GameData.ScoreLabel(s)) => s
+            case Some(NodeTag.ScoreLabel(s)) => s
             case _ => 0
         };
         updateScore(current + 1, scene)
 
     /// start_button 表示
-    pub def showStartButton(scene: Scene[GameData]): Scene[GameData] =
+    pub def showStartButton(scene: Scene[NodeTag]): Scene[NodeTag] =
         scene |> Scene.mapEngineNode(startButtonPath(), CanvasItem.show)
 
     /// start_button 非表示
-    pub def hideStartButton(scene: Scene[GameData]): Scene[GameData] =
+    pub def hideStartButton(scene: Scene[NodeTag]): Scene[NodeTag] =
         scene |> Scene.mapEngineNode(startButtonPath(), en -> CanvasItem.setVisible(false, en))
 
     /// message_timer 開始
-    pub def startMessageTimer(scene: Scene[GameData]): Scene[GameData] =
+    pub def startMessageTimer(scene: Scene[NodeTag]): Scene[NodeTag] =
         scene |> Scene.mapEngineNode(messageTimerPath(), EngineNode.mapTimer(Timer.start))
 
     /// title_timer 開始
-    pub def startTitleTimer(scene: Scene[GameData]): Scene[GameData] =
+    pub def startTitleTimer(scene: Scene[NodeTag]): Scene[NodeTag] =
         scene |> Scene.mapEngineNode(titleTimerPath(), EngineNode.mapTimer(Timer.start))
 
     // ========================================================================
@@ -109,21 +109,21 @@ mod HUDScene {
     // ========================================================================
 
     /// start_button が表示されているか
-    pub def isStartButtonVisible(scene: Scene[GameData]): Bool =
+    pub def isStartButtonVisible(scene: Scene[NodeTag]): Bool =
         match Scene.getEngineNode(startButtonPath(), scene) {
             case Some(en) => CanvasItem.isVisible(en)
             case None => false
         }
 
     /// start_button が押されたか
-    pub def isStartButtonJustPressed(scene: Scene[GameData]): Bool =
+    pub def isStartButtonJustPressed(scene: Scene[NodeTag]): Bool =
         match Scene.getEngineNode(startButtonPath(), scene) {
             case Some(EngineNode.ButtonWithState(btn, _)) => Button.isJustPressed(btn)
             case _ => false
         }
 
     /// justPressed フラグクリア
-    pub def clearStartButtonPress(scene: Scene[GameData]): Scene[GameData] =
+    pub def clearStartButtonPress(scene: Scene[NodeTag]): Scene[NodeTag] =
         scene |> Scene.mapEngineNode(startButtonPath(),
             EngineNode.mapButton(Button.clearJustPressed))
 }

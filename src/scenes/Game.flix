@@ -1,4 +1,4 @@
-// Game — Dodge the Creeps ゲーム専用の GameData 定義とシーン構築・ゲームループ
+// Game — Dodge the Creeps のノードタグ定義・trait instance・シーン構築・ゲームループ
 
 /// ゲームフェーズ
 pub enum GamePhase with Eq {
@@ -8,39 +8,44 @@ pub enum GamePhase with Eq {
     case GameOver
 }
 
-/// ゲーム固有の状態データ
-pub enum GameData {
+/// Mob のスポーン連番 ID
+pub type alias MobId = Int32
+
+/// スコア値
+pub type alias Score = Int32
+
+/// 各ノードに付与する識別タグ（Scene[NodeTag] の型パラメータ）
+pub enum NodeTag {
     case PlayerSprite(PlayerScene.PlayerData)
     case PlayerArea
-    case MobData(Int32)
-    case MobTimer(Int32)
+    case MobBody(MobId)
+    case MobTimer(MobId)
     case StartTimer
     case ScoreTimer
-    /// スコア値（score_label ノードに保持）
-    case ScoreLabel(Int32)
+    case ScoreLabel(Score)
     case StartButton
     case MessageTimer
     case TitleTimer
-    case Marker
+    case NoTag
 }
 
 pub type alias GameState = {
-    scene = Scene[GameData],
+    scene = Scene[NodeTag],
     phase = GamePhase
 }
 
 // ── Node 実装 ──
 
-instance Node[GameData] {
-    redef ready(node: EngineNode[GameData],
-                path: NodePath, scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) \ {GameEngine.Game, Math.Random} =
+instance Node[NodeTag] {
+    redef ready(node: EngineNode[NodeTag],
+                path: NodePath, scene: Scene[NodeTag]): (EngineNode[NodeTag], Scene[NodeTag]) \ {GameEngine.Game, Math.Random} =
         match node {
-            case EngineNode.AnimSprite2DWithState(sprite, GameData.PlayerSprite(playerData)) =>
+            case EngineNode.AnimSprite2DWithState(sprite, NodeTag.PlayerSprite(playerData)) =>
                 let (readySprite, readyPlayerData) = PlayerScene.ready(sprite, playerData);
                 (EngineNode.AnimSprite2DWithState(readySprite,
-                    GameData.PlayerSprite(readyPlayerData)), scene
+                    NodeTag.PlayerSprite(readyPlayerData)), scene
                 )
-            case EngineNode.RigidBody2DWithState(_, GameData.MobData(_)) =>
+            case EngineNode.RigidBody2DWithState(_, NodeTag.MobBody(_)) =>
                 let rot = Node2D.getRotation(node);
                 let newScene = MobScene.ready(path, rot, scene);
                 // MobScene.ready が path のノードに linearVelocity を設定するため、
@@ -52,25 +57,25 @@ instance Node[GameData] {
             case _ => (node, scene)
         }
 
-    redef process(delta: Float64, node: EngineNode[GameData],
-                    _path: NodePath, scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) \ Math.Random =
+    redef process(delta: Float64, node: EngineNode[NodeTag],
+                    _path: NodePath, scene: Scene[NodeTag]): (EngineNode[NodeTag], Scene[NodeTag]) \ Math.Random =
         checked_ecast(match node {
-            case EngineNode.AnimSprite2DWithState(sprite, GameData.PlayerSprite(playerData)) =>
+            case EngineNode.AnimSprite2DWithState(sprite, NodeTag.PlayerSprite(playerData)) =>
                 let movedSprite = PlayerScene.process(delta, sprite, playerData);
                 (EngineNode.AnimSprite2DWithState(movedSprite,
-                    GameData.PlayerSprite(playerData))
+                    NodeTag.PlayerSprite(playerData))
                 , scene)
             case _ => (node, scene)
         })
 }
 
 // 衝突判定
-instance AreaHandler[GameData] {
-    pub def onAreaEntered(_selfPath: NodePath, selfState: GameData,
-                          _otherPath: NodePath, otherState: GameData,
-                          scene: Scene[GameData]): Scene[GameData] =
+instance AreaHandler[NodeTag] {
+    pub def onAreaEntered(_selfPath: NodePath, selfState: NodeTag,
+                          _otherPath: NodePath, otherState: NodeTag,
+                          scene: Scene[NodeTag]): Scene[NodeTag] =
         match (selfState, otherState) {
-            case (GameData.PlayerArea, GameData.MobData(_)) =>
+            case (NodeTag.PlayerArea, NodeTag.MobBody(_)) =>
                 scene |> PlayerScene.mapPlayer(
                     (sprite, playerData) ->
                         (CanvasItem.hide(sprite), { hit = true | playerData }),
@@ -81,38 +86,38 @@ instance AreaHandler[GameData] {
 
 // ── ScreenNotifyHandler 実装 ──
 
-instance ScreenNotifyHandler[GameData] {
-    redef onScreenExited(path: NodePath, state: GameData,
-                         scene: Scene[GameData]): Scene[GameData] =
+instance ScreenNotifyHandler[NodeTag] {
+    redef onScreenExited(path: NodePath, state: NodeTag,
+                         scene: Scene[NodeTag]): Scene[NodeTag] =
         match state {
-            case GameData.MobData(_) => Scene.removeAt(path, scene)
+            case NodeTag.MobBody(_) => Scene.removeAt(path, scene)
             case _ => scene
         }
 }
 
 // ── TimerHandler 実装 ──
 
-instance TimerEvent.TimerHandler[GameData] {
-    redef onTimeout(timerPath: NodePath, state: GameData,
-                    scene: Scene[GameData]): Scene[GameData] \ Math.Random =
+instance TimerEvent.TimerHandler[NodeTag] {
+    redef onTimeout(timerPath: NodePath, state: NodeTag,
+                    scene: Scene[NodeTag]): Scene[NodeTag] \ Math.Random =
         match state {
-            case GameData.MobTimer(counter) =>
+            case NodeTag.MobTimer(counter) =>
                 let newScene = Game.spawnMobFromPath(counter, scene);
                 // カウンタをインクリメント
-                Scene.setState(timerPath, GameData.MobTimer(counter + 1), newScene)
-            case GameData.StartTimer =>
+                Scene.setState(timerPath, NodeTag.MobTimer(counter + 1), newScene)
+            case NodeTag.StartTimer =>
                 scene
                     |> Scene.mapEngineNode(Game.mobTimerPath(), EngineNode.mapTimer(Timer.start))
                     |> Scene.mapEngineNode(Game.scoreTimerPath(), EngineNode.mapTimer(Timer.start))
                     |> HUDScene.hideMessage
-            case GameData.ScoreTimer =>
+            case NodeTag.ScoreTimer =>
                 // スコアをインクリメントし、ラベルを更新する（Godot の _on_ScoreTimer_timeout 相当）
                 HUDScene.incrementScore(scene)
-            case GameData.MessageTimer =>
+            case NodeTag.MessageTimer =>
                 scene
                     |> HUDScene.showMessage("Dodge the\nCreeps")
                     |> HUDScene.startTitleTimer
-            case GameData.TitleTimer =>
+            case NodeTag.TitleTimer =>
                 scene
                     |> HUDScene.showStartButton
             case _ => scene
@@ -149,7 +154,7 @@ mod Game {
     // ========================================================================
 
     /// Path2D ベースで Mob をスポーンする
-    pub def spawnMobFromPath(counter: Int32, scene: Scene[GameData]): Scene[GameData] \ Math.Random =
+    pub def spawnMobFromPath(counter: Int32, scene: Scene[NodeTag]): Scene[NodeTag] \ Math.Random =
         let t = Math.Random.randomFloat64();
         let sample = Path2D.sample(t, Path2D.screenEdgePath(screenWi(), screenHi()));
         let name = MobScene.mobName(counter);
@@ -174,15 +179,15 @@ mod Game {
         );
         let bgNode = EngineNode.ColorRectWithState(
             CanvasItem.setZIndex(-100, bg),
-            GameData.Marker
+            NodeTag.NoTag
         );
         {   scene = Scene.empty()
                 |> Scene.addNode("background", bgNode)
                 |> PlayerScene.addPlayer
-                |> Scene.addNode(mobTimerName(), EngineNode.TimerWithState(mobTimer, GameData.MobTimer(0)))
-                |> Scene.addNode("mob_path", EngineNode.Path2DWithState(mobPath, GameData.Marker))
-                |> Scene.addNode(startTimerName(), EngineNode.TimerWithState(startTimer, GameData.StartTimer))
-                |> Scene.addNode(scoreTimerName(), EngineNode.TimerWithState(scoreTimer, GameData.ScoreTimer))
+                |> Scene.addNode(mobTimerName(), EngineNode.TimerWithState(mobTimer, NodeTag.MobTimer(0)))
+                |> Scene.addNode("mob_path", EngineNode.Path2DWithState(mobPath, NodeTag.NoTag))
+                |> Scene.addNode(startTimerName(), EngineNode.TimerWithState(startTimer, NodeTag.StartTimer))
+                |> Scene.addNode(scoreTimerName(), EngineNode.TimerWithState(scoreTimer, NodeTag.ScoreTimer))
                 |> HUDScene.addHUD(fontAtlas),
             phase = GamePhase.Menu
         }
@@ -240,7 +245,7 @@ mod Game {
     // ========================================================================
 
     /// エンジン更新パイプライン（process → physics → collision → screen → timers）
-    def engineUpdate(dt: Float64, scene: Scene[GameData]): Scene[GameData] \ {GameEngine.Game, Math.Random} =
+    def engineUpdate(dt: Float64, scene: Scene[NodeTag]): Scene[NodeTag] \ {GameEngine.Game, Math.Random} =
         (GameEngine.process(dt, false)
         >> GameEngine.physicsProcess(dt, false, PhysicsStep.defaultGravity())
         >> GameEngine.emitCollision
@@ -248,7 +253,7 @@ mod Game {
         >> GameEngine.emitTimers)(scene)
 
     /// 入力読み取り + エンジン更新
-    def inputAndUpdate(dt: Float64, scene: Scene[GameData]): Scene[GameData] \ {GameEngine.Game, Math.Random} =
+    def inputAndUpdate(dt: Float64, scene: Scene[NodeTag]): Scene[NodeTag] \ {GameEngine.Game, Math.Random} =
         let dir = readInputDirection();
         engineUpdate(dt, PlayerScene.applyInput(dir)(scene))
 

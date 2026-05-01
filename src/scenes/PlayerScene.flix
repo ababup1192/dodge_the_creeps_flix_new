@@ -50,7 +50,7 @@ mod PlayerScene {
     // ========================================================================
 
     /// プレイヤーノードをシーンに追加する（Area2D 子ノード付き、初期非表示）
-    pub def addPlayer(scene: Scene[GameData]): Scene[GameData] =
+    pub def addPlayer(scene: Scene[NodeTag]): Scene[NodeTag] =
         let sprite = AnimatedSprite2D.make(
             playerAnimations(),
             initialAnimation = walkAnimation(),
@@ -63,9 +63,9 @@ mod PlayerScene {
         let playerData = {velocity = Vec2.zero(), screenSize = Vec2.zero(), hit = false};
         scene
             |> Scene.addNode(name(),
-                EngineNode.AnimSprite2DWithState(sprite, GameData.PlayerSprite(playerData)))
+                EngineNode.AnimSprite2DWithState(sprite, NodeTag.PlayerSprite(playerData)))
             |> Scene.addChild(name(), areaName(),
-                EngineNode.Area2DWithState(area, GameData.PlayerArea))
+                EngineNode.Area2DWithState(area, NodeTag.PlayerArea))
             |> Scene.addChild(name(), "trail",
                 EngineNode.GPUParticles2DWithState(
                     GPUParticles2D.make({
@@ -74,7 +74,7 @@ mod PlayerScene {
                         startAlpha = 0.5f32, endAlpha = 0.0f32,
                         startScale = 0.5, endScale = 0.324
                     }) |> CanvasItem.setZIndex(-1),
-                    GameData.Marker))
+                    NodeTag.NoTag))
 
     // ========================================================================
     // ready: ビューポートサイズ取得
@@ -105,7 +105,7 @@ mod PlayerScene {
 
     /// Godot の start(pos) を再現: 位置設定 + 回転リセット + show + 衝突再有効化
     /// trail は visible 伝播により親（player）の表示に自動追従する
-    pub def start(pos: Vec2.Vec2, scene: Scene[GameData]): Scene[GameData] =
+    pub def start(pos: Vec2.Vec2, scene: Scene[NodeTag]): Scene[NodeTag] =
         scene |> mapPlayer(
             (sprite, playerData) ->
                 (sprite |> position(pos) |> rotation(0.0) |> show,
@@ -117,7 +117,7 @@ mod PlayerScene {
     // ========================================================================
 
     /// 方向ベクトルに応じてプレイヤーの速度とアニメーションを更新する
-    pub def applyInput(dir: Vec2.Vec2, scene: Scene[GameData]): Scene[GameData] =
+    pub def applyInput(dir: Vec2.Vec2, scene: Scene[NodeTag]): Scene[NodeTag] =
         let velocity = if (Vec2.length(dir) > 0.0)
                 Vec2.mul(Vec2.normalized(dir), speed())
             else
@@ -150,28 +150,28 @@ mod PlayerScene {
 
     /// プレイヤーの sprite と PlayerData を変換する
     pub def mapPlayerSprite(f: (AnimatedSprite2D, PlayerData) -> (AnimatedSprite2D, PlayerData),
-                            scene: Scene[GameData]): Scene[GameData] =
+                            scene: Scene[NodeTag]): Scene[NodeTag] =
         Scene.mapEngineNode(playerPath(), engineNode -> match engineNode {
-            case EngineNode.AnimSprite2DWithState(sprite, GameData.PlayerSprite(playerData)) =>
+            case EngineNode.AnimSprite2DWithState(sprite, NodeTag.PlayerSprite(playerData)) =>
                 let (newSprite, newPlayerData) = f(sprite, playerData);
-                EngineNode.AnimSprite2DWithState(newSprite, GameData.PlayerSprite(newPlayerData))
+                EngineNode.AnimSprite2DWithState(newSprite, NodeTag.PlayerSprite(newPlayerData))
             case other => other
         }, scene)
 
     /// プレイヤーの Area2D を変換する
-    pub def mapPlayerArea(f: Area2D -> Area2D, scene: Scene[GameData]): Scene[GameData] =
+    pub def mapPlayerArea(f: Area2D -> Area2D, scene: Scene[NodeTag]): Scene[NodeTag] =
         Scene.mapEngineNode(areaPath(), EngineNode.mapArea2D(f), scene)
 
     /// プレイヤーの sprite・PlayerData・Area2D をまとめて変換する
     pub def mapPlayer(spriteF: (AnimatedSprite2D, PlayerData) -> (AnimatedSprite2D, PlayerData),
                       areaF: Area2D -> Area2D,
-                      scene: Scene[GameData]): Scene[GameData] =
+                      scene: Scene[NodeTag]): Scene[NodeTag] =
         scene |> mapPlayerSprite(spriteF) |> mapPlayerArea(areaF)
 
     /// Scene から PlayerData を取り出す
-    pub def getPlayerData(scene: Scene[GameData]): PlayerData =
+    pub def getPlayerData(scene: Scene[NodeTag]): PlayerData =
         match Scene.getState(playerPath(), scene) {
-            case Some(GameData.PlayerSprite(playerData)) => playerData
+            case Some(NodeTag.PlayerSprite(playerData)) => playerData
             case _ => bug!("player not found")
         }
 

@@ -31,19 +31,19 @@ pub type alias XxxData = { velocity = Vec2.Vec2, hp = Int32 }
 - エンジン型（AnimatedSprite2D, Area2D 等）は `EngineNode` の中に1箇所だけ存在する。
   **`XxxData` にエンジン型を含めない**（二重管理を避けるため）
 
-### GameData バリアント設計
+### NodeTag バリアント設計
 
 親ノードの state にデータを持たせ、子ノードの state は識別タグにする:
 
 ```flix
-pub enum GameData {
+pub enum NodeTag {
     case XxxSprite(XxxScene.XxxData)  // 親ノード: データを保持
     case XxxArea                       // 子ノード: 識別タグ（衝突判定で使用）
-    case Marker                        // その他の子: 汎用タグ
+    case NoTag                        // その他の子: 汎用タグ
 }
 ```
 
-**アンチパターン: エンジン型をレコードにまとめて GameData に持つ**
+**アンチパターン: エンジン型をレコードにまとめて NodeTag に持つ**
 
 ```flix
 // NG: sprite が EngineNode と XxxNode の2箇所に存在し、毎フレーム同期が必要
@@ -65,10 +65,10 @@ def areaPath(): NodePath = name() :: areaName() :: Nil   // 非公開
 
 ## (C) 構築 — addXxx
 
-**原則: 親ノードが `XxxSprite(XxxData)` を持ち、子は識別タグまたは `Marker`。**
+**原則: 親ノードが `XxxSprite(XxxData)` を持ち、子は識別タグまたは `NoTag`。**
 
 ```flix
-pub def addXxx(scene: Scene[GameData]): Scene[GameData] =
+pub def addXxx(scene: Scene[NodeTag]): Scene[NodeTag] =
     let sprite = AnimatedSprite2D.make(animations, initialAnimation = "idle",
         fps = 5.0, startPos, scale)
         |> CanvasItem.hide;
@@ -77,23 +77,23 @@ pub def addXxx(scene: Scene[GameData]): Scene[GameData] =
     scene
         |> Scene.addNode(name(),
             EngineNode.AnimSprite2DWithState(sprite,
-                GameData.XxxSprite(xxxData)))           // 親: データを保持
+                NodeTag.XxxSprite(xxxData)))           // 親: データを保持
         |> Scene.addChild(name(), areaName(),
             EngineNode.Area2DWithState(area,
-                GameData.XxxArea))                       // 子: 識別タグ
+                NodeTag.XxxArea))                       // 子: 識別タグ
 ```
 
 動的スポーン（名前が実行時に決まる）の場合:
 
 ```flix
 pub def spawnXxx(name: String, position: Vec2.Vec2,
-                 scene: Scene[GameData]): Scene[GameData] =
+                 scene: Scene[NodeTag]): Scene[NodeTag] =
     scene
         |> Scene.addNode(name,
-            EngineNode.RigidBody2DWithState(body, GameData.XxxData(id)))
+            EngineNode.RigidBody2DWithState(body, NodeTag.XxxData(id)))
         |> Scene.addToGroup(name :: Nil, xxxGroup())    // グループで一括削除用
         |> Scene.addChild(name, childName(),
-            EngineNode.AnimSprite2DWithState(sprite, GameData.Marker))
+            EngineNode.AnimSprite2DWithState(sprite, NodeTag.NoTag))
 ```
 
 構築 API:
@@ -105,7 +105,7 @@ pub def spawnXxx(name: String, position: Vec2.Vec2,
 
 ### ready / process — Node instance への委譲
 
-XxxScene に ready / process を定義し、Game.flix の `Node[GameData]` instance から委譲する。
+XxxScene に ready / process を定義し、Game.flix の `Node[NodeTag]` instance から委譲する。
 スタイルは 2 種類ある:
 
 **純粋スタイル** — エンジン型 + データを受け取り、更新して返す。Node instance 側でラップ/アンラップ:
@@ -122,11 +122,11 @@ pub def process(dt: Float64, sprite: AnimatedSprite2D,
         Vec2.add(Node2D.getPosition(sprite), Vec2.mul(data#velocity, dt)),
         sprite)
 
-// Node[GameData] instance 側（エンジン型は EngineNode の中だけ — 同期コード不要）
+// Node[NodeTag] instance 側（エンジン型は EngineNode の中だけ — 同期コード不要）
 redef ready(node, _path, scene) = match node {
-    case EngineNode.AnimSprite2DWithState(sprite, GameData.XxxSprite(data)) =>
+    case EngineNode.AnimSprite2DWithState(sprite, NodeTag.XxxSprite(data)) =>
         let (s, d) = XxxScene.ready(sprite, data);
-        (EngineNode.AnimSprite2DWithState(s, GameData.XxxSprite(d)), scene)
+        (EngineNode.AnimSprite2DWithState(s, NodeTag.XxxSprite(d)), scene)
     case _ => (node, scene)
 }
 ```
@@ -136,13 +136,13 @@ redef ready(node, _path, scene) = match node {
 ```flix
 // XxxScene 側
 pub def ready(path: NodePath, direction: Float64,
-              scene: Scene[GameData]): Scene[GameData] \ Math.Random =
+              scene: Scene[NodeTag]): Scene[NodeTag] \ Math.Random =
     scene |> mapXxx(path, (body, data) ->
         (RigidBody2D.setLinearVelocity(vel, body), data))
 
-// Node[GameData] instance 側
+// Node[NodeTag] instance 側
 redef ready(node, path, scene) = match node {
-    case EngineNode.RigidBody2DWithState(_, GameData.XxxData(_)) =>
+    case EngineNode.RigidBody2DWithState(_, NodeTag.XxxData(_)) =>
         let newScene = XxxScene.ready(path, direction, scene);
         // mapXxx が path のノードを更新済みなので、シーンから取り直す
         match Scene.getEngineNode(path, newScene) {
@@ -161,7 +161,7 @@ Node instance 側は `Scene.getEngineNode` で取り直す（foldNodes の上書
 `mapXxxSprite` を使って scene を変換する:
 
 ```flix
-pub def applyInput(dir: Vec2.Vec2, scene: Scene[GameData]): Scene[GameData] =
+pub def applyInput(dir: Vec2.Vec2, scene: Scene[NodeTag]): Scene[NodeTag] =
     scene |> mapXxxSprite((sprite, data) ->
         (updateAnimation(dir, sprite),
          { velocity = computeVelocity(dir) | data }))
@@ -170,7 +170,7 @@ pub def applyInput(dir: Vec2.Vec2, scene: Scene[GameData]): Scene[GameData] =
 sprite と area の両方を操作する場合は `mapXxx` を使う:
 
 ```flix
-pub def start(pos: Vec2.Vec2, scene: Scene[GameData]): Scene[GameData] =
+pub def start(pos: Vec2.Vec2, scene: Scene[NodeTag]): Scene[NodeTag] =
     scene |> mapXxx(
         (sprite, data) ->
             (sprite |> position(pos) |> show, { hit = false | data }),
@@ -180,7 +180,7 @@ pub def start(pos: Vec2.Vec2, scene: Scene[GameData]): Scene[GameData] =
 単一ノードだけ操作する場合は `Scene.mapEngineNode` で十分:
 
 ```flix
-pub def setText(text: String, scene: Scene[GameData]): Scene[GameData] =
+pub def setText(text: String, scene: Scene[NodeTag]): Scene[NodeTag] =
     scene |> Scene.mapEngineNode(labelPath(),
         EngineNode.mapLabel2D(Label2D.setText(text)))
 ```
@@ -198,28 +198,28 @@ mapXxx        ── mapXxxSprite >> mapXxxArea の合成
 ```flix
 /// 親ノードの sprite と XxxData を変換する
 pub def mapXxxSprite(f: (AnimatedSprite2D, XxxData) -> (AnimatedSprite2D, XxxData),
-                     scene: Scene[GameData]): Scene[GameData] =
+                     scene: Scene[NodeTag]): Scene[NodeTag] =
     Scene.mapEngineNode(xxxPath(), engineNode -> match engineNode {
-        case EngineNode.AnimSprite2DWithState(sprite, GameData.XxxSprite(data)) =>
+        case EngineNode.AnimSprite2DWithState(sprite, NodeTag.XxxSprite(data)) =>
             let (newSprite, newData) = f(sprite, data);
-            EngineNode.AnimSprite2DWithState(newSprite, GameData.XxxSprite(newData))
+            EngineNode.AnimSprite2DWithState(newSprite, NodeTag.XxxSprite(newData))
         case other => other
     }, scene)
 
 /// 子ノードの Area2D を変換する
-pub def mapXxxArea(f: Area2D -> Area2D, scene: Scene[GameData]): Scene[GameData] =
+pub def mapXxxArea(f: Area2D -> Area2D, scene: Scene[NodeTag]): Scene[NodeTag] =
     Scene.mapEngineNode(areaPath(), EngineNode.mapArea2D(f), scene)
 
 /// sprite・XxxData・Area2D をまとめて変換する（mapXxxSprite と mapXxxArea の合成）
 pub def mapXxx(spriteF: (AnimatedSprite2D, XxxData) -> (AnimatedSprite2D, XxxData),
                areaF: Area2D -> Area2D,
-               scene: Scene[GameData]): Scene[GameData] =
+               scene: Scene[NodeTag]): Scene[NodeTag] =
     scene |> mapXxxSprite(spriteF) |> mapXxxArea(areaF)
 
 /// Scene から XxxData を取り出す
-pub def getXxxData(scene: Scene[GameData]): XxxData =
+pub def getXxxData(scene: Scene[NodeTag]): XxxData =
     match Scene.getState(xxxPath(), scene) {
-        case Some(GameData.XxxSprite(data)) => data
+        case Some(NodeTag.XxxSprite(data)) => data
         case _ => bug!("xxx not found")
     }
 ```
@@ -238,11 +238,11 @@ pub def getXxxData(scene: Scene[GameData]): XxxData =
 ```flix
 pub def mapXxxBody(path: NodePath,
                    f: (RigidBody2D, XxxData) -> (RigidBody2D, XxxData),
-                   scene: Scene[GameData]): Scene[GameData] =
+                   scene: Scene[NodeTag]): Scene[NodeTag] =
     Scene.mapEngineNode(path, engineNode -> match engineNode {
-        case EngineNode.RigidBody2DWithState(body, GameData.XxxData(data)) =>
+        case EngineNode.RigidBody2DWithState(body, NodeTag.XxxData(data)) =>
             let (newBody, newData) = f(body, data);
-            EngineNode.RigidBody2DWithState(newBody, GameData.XxxData(newData))
+            EngineNode.RigidBody2DWithState(newBody, NodeTag.XxxData(newData))
         case other => other
     }, scene)
 ```

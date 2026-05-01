@@ -11,14 +11,14 @@ def testMobSceneSpawnMobAddsNode(): Unit \ Assert =
         |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0);
     Assert.assertTrue(not Option.isEmpty(Scene.getEngineNode("mob_0" :: Nil, scene)))
 
-/// spawnMob で追加された Mob の状態が MobData である
+/// spawnMob で追加された Mob の状態が MobBody である
 @Test
 def testMobSceneSpawnMobState(): Unit \ Assert =
     let scene = Scene.empty()
         |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0);
     match Scene.getState("mob_0" :: Nil, scene) {
-        case Some(GameData.MobData(_)) => Assert.assertTrue(true)
-        case _ => bug!("Expected MobData")
+        case Some(NodeTag.MobBody(_)) => Assert.assertTrue(true)
+        case _ => bug!("Expected MobBody")
     }
 
 /// spawnMob で Mob の位置が指定座標に設定される
@@ -35,8 +35,8 @@ def testMobSceneSpawnMobHasSpriteChild(): Unit \ Assert =
     let scene = Scene.empty()
         |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0);
     match Scene.getState("mob_0" :: "sprite" :: Nil, scene) {
-        case Some(GameData.Marker) => Assert.assertTrue(true)
-        case _ => bug!("Expected Marker child")
+        case Some(NodeTag.NoTag) => Assert.assertTrue(true)
+        case _ => bug!("Expected NoTag child")
     }
 
 /// spawnMob で生成された Mob は RigidBody2D である
@@ -55,9 +55,9 @@ def testMobSceneSpawnMobHasNotifierChild(): Unit \ Assert =
     let scene = Scene.empty()
         |> MobScene.spawnMob("mob_0", {x = 240.0, y = -50.0}, 0);
     match Scene.getEngineNode("mob_0" :: "notifier" :: Nil, scene) {
-        case Some(EngineNode.ScreenNotifier2DWithState(_, GameData.Marker)) =>
+        case Some(EngineNode.ScreenNotifier2DWithState(_, NodeTag.NoTag)) =>
             Assert.assertTrue(true)
-        case _ => bug!("Expected ScreenNotifier2DWithState child with Marker")
+        case _ => bug!("Expected ScreenNotifier2DWithState child with NoTag")
     }
 
 /// spawnMob で Mob が "mobs" グループに追加される

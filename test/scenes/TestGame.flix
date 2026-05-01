@@ -57,13 +57,13 @@ def testFontAtlas(): FontAtlas = {
 }
 
 /// テスト用ヘルパー: buildState のシーンを取得
-def testScene(): Scene[GameData] = Game.buildState(testFontAtlas())#scene
+def testScene(): Scene[NodeTag] = Game.buildState(testFontAtlas())#scene
 
 /// テスト用ヘルパー: buildState を取得
 def testState(): GameState = Game.buildState(testFontAtlas())
 
 /// テスト用ヘルパー: processAll 済みのシーンを取得（screenSize が設定される）
-def testReadyScene(): Scene[GameData] =
+def testReadyScene(): Scene[NodeTag] =
     withMockEngine(() -> Scene.processAll(0.0, false, testScene()))
 
 /// Vec2 をタプルに変換するヘルパー
@@ -118,7 +118,7 @@ def testPlayerWalkAnimation(): Unit \ Assert =
 @Test
 def testPlayerInitialVelocity(): Unit \ Assert =
     match Scene.get("player", testScene()) {
-        case Some(GameData.PlayerSprite(pd)) =>
+        case Some(NodeTag.PlayerSprite(pd)) =>
             Assert.assertEq(expected = (0.0, 0.0), vecToTuple(pd#velocity))
         case _ => bug!("player state mismatch")
     }
@@ -194,7 +194,7 @@ def testInputDirectionNone(): Unit \ Assert =
 def testApplyInputSetsVelocity(): Unit \ Assert =
     let scene = PlayerScene.applyInput({x = 1.0, y = 0.0}, testScene());
     match Scene.get("player", scene) {
-        case Some(GameData.PlayerSprite(pd)) =>
+        case Some(NodeTag.PlayerSprite(pd)) =>
             Assert.assertEq(expected = (400.0, 0.0), vecToTuple(pd#velocity))
         case _ => bug!("player state mismatch")
     }
@@ -204,7 +204,7 @@ def testApplyInputSetsVelocity(): Unit \ Assert =
 def testApplyInputZeroVelocity(): Unit \ Assert =
     let scene = PlayerScene.applyInput(Vec2.zero(), testScene());
     match Scene.get("player", scene) {
-        case Some(GameData.PlayerSprite(pd)) =>
+        case Some(NodeTag.PlayerSprite(pd)) =>
             Assert.assertEq(expected = (0.0, 0.0), vecToTuple(pd#velocity))
         case _ => bug!("player state mismatch")
     }
@@ -292,8 +292,8 @@ def testPlayerProcessMoves(): Unit \ Assert =
     let scene = testReadyScene()
         |> Scene.mapState("player" :: Nil, state ->
             match state {
-                case GameData.PlayerSprite(pd) =>
-                    GameData.PlayerSprite({velocity = {x = 400.0, y = 0.0} | pd})
+                case NodeTag.PlayerSprite(pd) =>
+                    NodeTag.PlayerSprite({velocity = {x = 400.0, y = 0.0} | pd})
                 case other => other
             });
     let pos = withMockEngine(() -> scene |> Scene.processAll(0.1, false)) |> Scene.globalPosition("player");
@@ -311,8 +311,8 @@ def testPlayerClampRight(): Unit \ Assert =
     let scene = testReadyScene()
         |> Scene.mapState("player" :: Nil, state ->
             match state {
-                case GameData.PlayerSprite(pd) =>
-                    GameData.PlayerSprite({velocity = {x = 400.0, y = 0.0} | pd})
+                case NodeTag.PlayerSprite(pd) =>
+                    NodeTag.PlayerSprite({velocity = {x = 400.0, y = 0.0} | pd})
                 case other => other
             });
     let pos = withMockEngine(() -> scene |> Scene.processAll(1.0, false)) |> Scene.globalPosition("player");
@@ -324,8 +324,8 @@ def testPlayerClampLeft(): Unit \ Assert =
     let scene = testReadyScene()
         |> Scene.mapState("player" :: Nil, state ->
             match state {
-                case GameData.PlayerSprite(pd) =>
-                    GameData.PlayerSprite({velocity = {x = -400.0, y = 0.0} | pd})
+                case NodeTag.PlayerSprite(pd) =>
+                    NodeTag.PlayerSprite({velocity = {x = -400.0, y = 0.0} | pd})
                 case other => other
             });
     let pos = withMockEngine(() -> scene |> Scene.processAll(1.0, false)) |> Scene.globalPosition("player");
@@ -369,7 +369,7 @@ def testSwitchAnimResetsFrame(): Unit \ Assert =
 def testReadySetsScreenSize(): Unit \ Assert =
     let scene = withMockEngine(() -> Scene.processAll(0.0, false, testScene()));
     match Scene.get("player", scene) {
-        case Some(GameData.PlayerSprite(pd)) =>
+        case Some(NodeTag.PlayerSprite(pd)) =>
             Assert.assertEq(expected = (480.0, 720.0), vecToTuple(pd#screenSize))
         case _ => bug!("player state mismatch")
     }
@@ -421,7 +421,7 @@ def testPlayerAreaChildExists(): Unit \ Assert =
 @Test
 def testPlayerAreaChildState(): Unit \ Assert =
     match Scene.getState("player" :: "area" :: Nil, testScene()) {
-        case Some(GameData.PlayerArea) => Assert.assertTrue(true)
+        case Some(NodeTag.PlayerArea) => Assert.assertTrue(true)
         case _ => bug!("player area state mismatch")
     }
 
@@ -481,11 +481,11 @@ def testDetectOverlapsPlayerMob(): Unit \ Assert =
 // Start ボタン: 座標・サイズ・配置
 // ========================================================================
 
-/// HUD CanvasLayer が存在し、状態が Marker であること
+/// HUD CanvasLayer が存在し、状態が NoTag であること
 @Test
 def testHUDCanvasLayerExists(): Unit \ Assert =
     match Scene.getState(HUDScene.hudName() :: Nil, testScene()) {
-        case Some(GameData.Marker) => Assert.assertTrue(true)
+        case Some(NodeTag.NoTag) => Assert.assertTrue(true)
         case _ => bug!("hud not found or wrong state")
     }
 
@@ -493,7 +493,7 @@ def testHUDCanvasLayerExists(): Unit \ Assert =
 @Test
 def testStartButtonExists(): Unit \ Assert =
     match Scene.getState(HUDScene.startButtonPath(), testScene()) {
-        case Some(GameData.StartButton) => Assert.assertTrue(true)
+        case Some(NodeTag.StartButton) => Assert.assertTrue(true)
         case _ => bug!("start_button not found or wrong state")
     }
 
@@ -590,7 +590,7 @@ def testScoreLabelInitialText(): Unit \ Assert =
 @Test
 def testMessageTimerExists(): Unit \ Assert =
     match Scene.getState(HUDScene.messageTimerPath(), testScene()) {
-        case Some(GameData.MessageTimer) => Assert.assertTrue(true)
+        case Some(NodeTag.MessageTimer) => Assert.assertTrue(true)
         case _ => bug!("message_timer not found or wrong state")
     }
 
@@ -598,7 +598,7 @@ def testMessageTimerExists(): Unit \ Assert =
 @Test
 def testTitleTimerExists(): Unit \ Assert =
     match Scene.getState(HUDScene.titleTimerPath(), testScene()) {
-        case Some(GameData.TitleTimer) => Assert.assertTrue(true)
+        case Some(NodeTag.TitleTimer) => Assert.assertTrue(true)
         case _ => bug!("title_timer not found or wrong state")
     }
 
