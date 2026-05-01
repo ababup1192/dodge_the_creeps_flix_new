@@ -15,8 +15,8 @@ pub enum GameData {
     case MobData(Int32)
     case MobTimer(Int32)
     case StartTimer
-    case ScoreTimer
-    case ScoreLabel(Int32)
+    /// ScoreTimer: Bool はスコア加算待ちフラグ（true = タイムアウト発生、gameLoop で消費）
+    case ScoreTimer(Bool)
     case StartButton
     case MessageTimer
     case TitleTimer
@@ -26,7 +26,8 @@ pub enum GameData {
 pub type alias GameState = {
     scene = Scene[GameData],
     mobCounter = Int32,
-    phase = GamePhase
+    phase = GamePhase,
+    score = Int32
 }
 
 // ── Node 実装 ──
@@ -105,12 +106,9 @@ instance TimerEvent.TimerHandler[GameData] {
                     |> Scene.mapEngineNode(Game.mobTimerPath(), EngineNode.mapTimer(Timer.start))
                     |> Scene.mapEngineNode(Game.scoreTimerPath(), EngineNode.mapTimer(Timer.start))
                     |> HUDScene.hideMessage
-            case GameData.ScoreTimer =>
-                match Scene.getState(HUDScene.scoreLabelPath(), scene) {
-                    case Some(GameData.ScoreLabel(score)) =>
-                        HUDScene.updateScore(score + 1, scene)
-                    case _ => scene
-                }
+            case GameData.ScoreTimer(_) =>
+                // スコア加算待ちフラグを立てる（gameLoop 側で GameState.score をインクリメント）
+                Scene.setState(timerPath, GameData.ScoreTimer(true), scene)
             case GameData.MessageTimer =>
                 scene
                     |> HUDScene.showMessage("Dodge the\nCreeps")
@@ -185,10 +183,11 @@ mod Game {
                 |> Scene.addNode(mobTimerName(), EngineNode.TimerWithState(mobTimer, GameData.MobTimer(0)))
                 |> Scene.addNode("mob_path", EngineNode.Path2DWithState(mobPath, GameData.Marker))
                 |> Scene.addNode(startTimerName(), EngineNode.TimerWithState(startTimer, GameData.StartTimer))
-                |> Scene.addNode(scoreTimerName(), EngineNode.TimerWithState(scoreTimer, GameData.ScoreTimer))
+                |> Scene.addNode(scoreTimerName(), EngineNode.TimerWithState(scoreTimer, GameData.ScoreTimer(false)))
                 |> HUDScene.addHUD(fontAtlas),
             mobCounter = 0,
-            phase = GamePhase.Menu
+            phase = GamePhase.Menu,
+            score = 0
         }
 
     // ========================================================================
@@ -225,7 +224,7 @@ mod Game {
             |> HUDScene.updateScore(0)
             |> HUDScene.hideStartButton
             |> Scene.mapEngineNode(startTimerPath(), EngineNode.mapTimer(Timer.start));
-        { scene = scene, mobCounter = 0, phase = GamePhase.GetReady }
+        { scene = scene, mobCounter = 0, phase = GamePhase.GetReady, score = 0 }
 
     /// Playing → GameOver: タイマー停止、GameOver メッセージ、MessageTimer 開始、BGM 停止 + 死亡 SE 再生
     pub def gameOver(state: GameState): GameState \ GameEngine.Audio =
@@ -291,8 +290,19 @@ mod Game {
                     let updatedScene = inputAndUpdate(dt, state#scene);
                     if (PlayerScene.getPlayerData(updatedScene)#hit)
                         gameOver({ scene = updatedScene | state })
-                    else
-                        { scene = updatedScene | state }
+                    else {
+                        // ScoreTimer のフラグを消費してスコアを加算（Godot の _on_ScoreTimer_timeout 相当）
+                        match Scene.getState(scoreTimerPath(), updatedScene) {
+                            case Some(GameData.ScoreTimer(true)) =>
+                                let newScore = state#score + 1;
+                                let scoredScene = updatedScene
+                                    |> HUDScene.updateScore(newScore)
+                                    |> Scene.setState(scoreTimerPath(), GameData.ScoreTimer(false));
+                                { scene = scoredScene, score = newScore | state }
+                            case _ =>
+                                { scene = updatedScene | state }
+                        }
+                    }
                 case GamePhase.GameOver =>
                     let updatedScene = engineUpdate(dt, state#scene);
                     if (HUDScene.isStartButtonVisible(updatedScene))

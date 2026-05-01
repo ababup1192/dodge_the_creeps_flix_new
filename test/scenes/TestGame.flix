@@ -569,7 +569,7 @@ def testStartButtonVisibleOnMenu(): Unit \ Assert =
         case None => bug!("start_button not found")
     }
 
-/// ScoreLabel が初期表示状態であること（Godot 準拠: 常時表示）
+/// score_label が初期表示状態であること（Godot 準拠: 常時表示）
 @Test
 def testScoreLabelVisibleInitially(): Unit \ Assert =
     match Scene.getEngineNode(HUDScene.scoreLabelPath(), testScene()) {
@@ -577,7 +577,7 @@ def testScoreLabelVisibleInitially(): Unit \ Assert =
         case None => bug!("score_label not found")
     }
 
-/// ScoreLabel の初期テキストが "0" であること
+/// score_label の初期テキストが "0" であること
 @Test
 def testScoreLabelInitialText(): Unit \ Assert =
     match Scene.getEngineNode(HUDScene.scoreLabelPath(), testScene()) {

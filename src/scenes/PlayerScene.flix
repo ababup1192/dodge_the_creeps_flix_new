@@ -33,9 +33,6 @@ mod PlayerScene {
     /// プレイヤー移動速度（px/秒）
     def speed(): Float64 = 400.0
 
-    /// π（円周率）
-    def pi(): Float64 = 3.14159265358979
-
     def walkAnimation(): String = "walk"
     def upAnimation(): String = "up"
 
@@ -146,7 +143,7 @@ mod PlayerScene {
                    |> rotation(0.0)
         else if (dir#y != 0.0)
             sprite |> AnimatedSprite2D.play(upAnimation())
-                   |> rotation(if (dir#y > 0.0) pi() else 0.0)
+                   |> rotation(if (dir#y > 0.0) Vec2.pi() else 0.0)
         else
             AnimatedSprite2D.stop(sprite)
 

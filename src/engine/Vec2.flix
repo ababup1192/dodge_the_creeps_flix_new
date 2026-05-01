@@ -6,19 +6,25 @@ mod Vec2 {
     pub type alias Vec2 = {x = Float64, y = Float64}
 
     // ========================================================================
-    // Math Helpers (internal)
+    // Math Helpers
     // ========================================================================
 
     def sqrt(v: Float64): Float64 =
         unchecked_cast(Math.sqrt(v) as _ \ {})
 
-    def sin(x: Float64): Float64 =
+    /// 円周率
+    pub def pi(): Float64 = 3.14159265358979
+
+    /// sin（pure キャスト）
+    pub def sin(x: Float64): Float64 =
         unchecked_cast(Math.sin(x) as _ \ {})
 
-    def cos(x: Float64): Float64 =
+    /// cos（pure キャスト）
+    pub def cos(x: Float64): Float64 =
         unchecked_cast(Math.cos(x) as _ \ {})
 
-    def atan2(y: Float64, x: Float64): Float64 =
+    /// atan2（pure キャスト）
+    pub def atan2(y: Float64, x: Float64): Float64 =
         unchecked_cast(Math.atan2(y, x) as _ \ {})
 
 

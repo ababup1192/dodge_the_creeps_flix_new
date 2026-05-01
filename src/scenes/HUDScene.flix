@@ -1,6 +1,6 @@
 // HUDScene — Godot HUD.gd/HUD.tscn 準拠の HUD シーン構築・操作
 //
-// CanvasLayer に ScoreLabel / MessageLabel / StartButton / MessageTimer / TitleTimer を配置し、
+// CanvasLayer に ScoreLabel / MessageLabel / StartButton / MessageTimer / TitleTimer を配置し
 // Godot デモの HUD と同等の機能を提供する。
 //
 //   hud (CanvasLayer, drawLayer=1)
@@ -50,7 +50,7 @@ mod HUDScene {
             |> Scene.addNode(hudName(),
                 EngineNode.CanvasLayerWithState(hud, GameData.Marker))
             |> Scene.addChild(hudName(), scoreLabelName(),
-                EngineNode.Label2DWithState(scoreLabel, GameData.ScoreLabel(0)))
+                EngineNode.Label2DWithState(scoreLabel, GameData.Marker))
             |> Scene.addChild(hudName(), messageLabelName(),
                 EngineNode.Label2DWithState(messageLabel, GameData.Marker))
             |> Scene.addChild(hudName(), startButtonName(),
@@ -73,12 +73,10 @@ mod HUDScene {
     pub def hideMessage(scene: Scene[GameData]): Scene[GameData] =
         scene |> Scene.mapEngineNode(messageLabelPath(), en -> CanvasItem.setVisible(false, en))
 
-    /// score_label テキスト更新 + ScoreLabel state 更新
+    /// score_label テキスト更新
     pub def updateScore(score: Int32, scene: Scene[GameData]): Scene[GameData] =
-        scene
-            |> Scene.setState(scoreLabelPath(), GameData.ScoreLabel(score))
-            |> Scene.mapEngineNode(scoreLabelPath(),
-                EngineNode.mapLabel2D(Label2D.setText(Int32.toString(score))))
+        scene |> Scene.mapEngineNode(scoreLabelPath(),
+            EngineNode.mapLabel2D(Label2D.setText(Int32.toString(score))))
 
     /// start_button 表示
     pub def showStartButton(scene: Scene[GameData]): Scene[GameData] =

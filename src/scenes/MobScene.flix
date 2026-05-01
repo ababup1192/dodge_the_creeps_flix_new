@@ -8,22 +8,10 @@
 //     └── ScreenNotifier2DWithState(notifier, MobNotifier)
 
 mod MobScene {
-    import java.lang.Math
 
     /// body: Mob の物理ボディ（RigidBody2D）
     /// sprite: Mob のアニメーションスプライト
     pub type alias MobNode = { body = RigidBody2D, sprite = AnimatedSprite2D }
-
-    /// 円周率
-    def pi(): Float64 = 3.14159265358979
-
-    /// sin（pure キャスト）
-    def sin(x: Float64): Float64 =
-        unchecked_cast(Math.sin(x) as _ \ {})
-
-    /// cos（pure キャスト）
-    def cos(x: Float64): Float64 =
-        unchecked_cast(Math.cos(x) as _ \ {})
 
     /// Mob のスプライト子ノード名
     def spriteName(): String = "sprite"
@@ -91,12 +79,11 @@ mod MobScene {
     /// speed は 150〜250 の範囲でランダムに決定する。
     pub def ready(path: NodePath, direction: Float64, scene: Scene[GameData]): Scene[GameData] \ Math.Random =
         let animation = pickAnimation();
-        let pi = pi();
-        let dirOffset = RandomUtil.randomRange(0.0 - pi / 4.0, pi / 4.0);
+        let dirOffset = RandomUtil.randomRange(0.0 - Vec2.pi() / 4.0, Vec2.pi() / 4.0);
         let finalDir = direction + dirOffset;
         let speed = RandomUtil.randomRange(150.0, 250.0);
-        let vx = cos(finalDir) * speed;
-        let vy = sin(finalDir) * speed;
+        let vx = Vec2.cos(finalDir) * speed;
+        let vy = Vec2.sin(finalDir) * speed;
         scene |> mapMob(path, (mobNode, counter) ->
             ({ body = RigidBody2D.setLinearVelocity({x = vx, y = vy}, mobNode#body),
                sprite = mobNode#sprite

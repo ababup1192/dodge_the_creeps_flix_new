@@ -22,11 +22,6 @@ pub enum Path2D {
 }
 
 mod Path2D {
-    import java.lang.Math
-
-    /// atan2（pure キャスト）
-    def atan2(y: Float64, x: Float64): Float64 =
-        unchecked_cast(Math.atan2(y, x) as _ \ {})
 
     /// デフォルト値で Path2D を生成する
     pub def make(points: List[Vec2.Vec2], closed: Bool): Path2D =
@@ -92,7 +87,7 @@ mod Path2D {
             let position = Vec2.lerp(p0, p1, frac);
             let edge: Vec2.Vec2 = Vec2.sub(p1, p0);
             // 内向き法線: 辺 (dx, dy) に対して左手法線 (-dy, dx) → atan2 で角度
-            let direction = atan2(edge#x, 0.0 - edge#y);
+            let direction = Vec2.atan2(edge#x, 0.0 - edge#y);
             { position = position, direction = direction }
         }
 
