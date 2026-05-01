@@ -118,7 +118,7 @@ def testPlayerWalkAnimation(): Unit \ Assert =
 @Test
 def testPlayerInitialVelocity(): Unit \ Assert =
     match Scene.get("player", testScene()) {
-        case Some(GameData.Player(_, pd)) =>
+        case Some(GameData.PlayerSprite(pd)) =>
             Assert.assertEq(expected = (0.0, 0.0), vecToTuple(pd#velocity))
         case _ => bug!("player state mismatch")
     }
@@ -194,7 +194,7 @@ def testInputDirectionNone(): Unit \ Assert =
 def testApplyInputSetsVelocity(): Unit \ Assert =
     let scene = PlayerScene.applyInput({x = 1.0, y = 0.0}, testScene());
     match Scene.get("player", scene) {
-        case Some(GameData.Player(_, pd)) =>
+        case Some(GameData.PlayerSprite(pd)) =>
             Assert.assertEq(expected = (400.0, 0.0), vecToTuple(pd#velocity))
         case _ => bug!("player state mismatch")
     }
@@ -204,7 +204,7 @@ def testApplyInputSetsVelocity(): Unit \ Assert =
 def testApplyInputZeroVelocity(): Unit \ Assert =
     let scene = PlayerScene.applyInput(Vec2.zero(), testScene());
     match Scene.get("player", scene) {
-        case Some(GameData.Player(_, pd)) =>
+        case Some(GameData.PlayerSprite(pd)) =>
             Assert.assertEq(expected = (0.0, 0.0), vecToTuple(pd#velocity))
         case _ => bug!("player state mismatch")
     }
@@ -292,8 +292,8 @@ def testPlayerProcessMoves(): Unit \ Assert =
     let scene = testReadyScene()
         |> Scene.mapState("player" :: Nil, state ->
             match state {
-                case GameData.Player(pn, pd) =>
-                    GameData.Player(pn, {velocity = {x = 400.0, y = 0.0} | pd})
+                case GameData.PlayerSprite(pd) =>
+                    GameData.PlayerSprite({velocity = {x = 400.0, y = 0.0} | pd})
                 case other => other
             });
     let pos = withMockEngine(() -> scene |> Scene.processAll(0.1, false)) |> Scene.globalPosition("player");
@@ -311,8 +311,8 @@ def testPlayerClampRight(): Unit \ Assert =
     let scene = testReadyScene()
         |> Scene.mapState("player" :: Nil, state ->
             match state {
-                case GameData.Player(pn, pd) =>
-                    GameData.Player(pn, {velocity = {x = 400.0, y = 0.0} | pd})
+                case GameData.PlayerSprite(pd) =>
+                    GameData.PlayerSprite({velocity = {x = 400.0, y = 0.0} | pd})
                 case other => other
             });
     let pos = withMockEngine(() -> scene |> Scene.processAll(1.0, false)) |> Scene.globalPosition("player");
@@ -324,8 +324,8 @@ def testPlayerClampLeft(): Unit \ Assert =
     let scene = testReadyScene()
         |> Scene.mapState("player" :: Nil, state ->
             match state {
-                case GameData.Player(pn, pd) =>
-                    GameData.Player(pn, {velocity = {x = -400.0, y = 0.0} | pd})
+                case GameData.PlayerSprite(pd) =>
+                    GameData.PlayerSprite({velocity = {x = -400.0, y = 0.0} | pd})
                 case other => other
             });
     let pos = withMockEngine(() -> scene |> Scene.processAll(1.0, false)) |> Scene.globalPosition("player");
@@ -369,7 +369,7 @@ def testSwitchAnimResetsFrame(): Unit \ Assert =
 def testReadySetsScreenSize(): Unit \ Assert =
     let scene = withMockEngine(() -> Scene.processAll(0.0, false, testScene()));
     match Scene.get("player", scene) {
-        case Some(GameData.Player(_, pd)) =>
+        case Some(GameData.PlayerSprite(pd)) =>
             Assert.assertEq(expected = (480.0, 720.0), vecToTuple(pd#screenSize))
         case _ => bug!("player state mismatch")
     }
@@ -761,8 +761,8 @@ def testParentHideHidesChildDrawables(): Unit \ Assert =
     let hasTrailBefore = List.exists(d -> d#zIndex == 9, visibleDrawables);
     Assert.assertTrue(hasTrailBefore);
     // player hide → trail も Drawable から消える（visible 伝播）
-    let hiddenScene = scene |> PlayerScene.mapPlayer((playerNode, playerData) ->
-        ({ sprite = CanvasItem.hide(playerNode#sprite) | playerNode }, playerData));
+    let hiddenScene = scene |> PlayerScene.mapPlayerSprite((sprite, playerData) ->
+        (CanvasItem.hide(sprite), playerData));
     let hiddenDrawables = Scene.toDrawables(hiddenScene);
     let hasTrailAfter = List.exists(d -> d#zIndex == 9, hiddenDrawables);
     Assert.assertFalse(hasTrailAfter)
@@ -773,8 +773,8 @@ def testParentModulatePropagates(): Unit \ Assert =
     let scene = testReadyScene()
         |> PlayerScene.start({x = 240.0, y = 450.0})
         // player の modulate を赤(1,0,0)に設定
-        |> PlayerScene.mapPlayer((playerNode, playerData) ->
-            ({ sprite = CanvasItem.setModulate({r = 1.0f32, g = 0.0f32, b = 0.0f32}, playerNode#sprite) | playerNode }, playerData));
+        |> PlayerScene.mapPlayerSprite((sprite, playerData) ->
+            (CanvasItem.setModulate({r = 1.0f32, g = 0.0f32, b = 0.0f32}, sprite), playerData));
     let drawables = Scene.toDrawables(scene);
     // trail の Drawable を取得（zIndex == -1 は trail のパーティクル）
     let trailDrawables = List.filter(d -> d#zIndex == -1, drawables);

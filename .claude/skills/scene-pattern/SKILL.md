@@ -1,6 +1,6 @@
 ---
 name: scene-pattern
-description: "XxxSceneモジュールの構築・更新パターン。型定義・定数・addXxx・extract/commit/mapの書き方"
+description: "XxxSceneモジュールの構築・更新パターン。型定義・定数・addXxx・mapXxxSprite/mapXxxArea/mapXxxの書き方"
 user-invocable: false
 ---
 
@@ -12,53 +12,75 @@ user-invocable: false
 
 ```
 mod XxxScene {
-    // (A) 型定義   — XxxNode + XxxData
+    // (A) 型定義   — XxxData
     // (B) 定数     — name / path / shape / animations
     // (C) 構築     — addXxx: Scene → Scene
     // (D) ロジック — ready / process / start 等
-    // (E) extract / commit / map
+    // (E) mapXxxSprite / mapXxxArea / mapXxx（合成）
 }
 ```
 
 ## (A) 型定義
 
 ```flix
-/// エンジン型のレコード（そのシーンが管理する描画・物理の実体）
-pub type alias XxxNode = { sprite = AnimatedSprite2D, area = Area2D }
-
 /// ゲーム状態（フレーム間で変化する純粋データ）
 pub type alias XxxData = { velocity = Vec2.Vec2, hp = Int32 }
 ```
 
-- `XxxNode`: エンジン型をまとめたレコード。フィールド数はノード構成に応じて増減
-- `XxxData`: 型は自由。レコード、Int32、Bool など用途に合わせる
+- `XxxData`: フレーム間で変化する純粋データ。レコード、Int32、Bool など用途に合わせる
+- エンジン型（AnimatedSprite2D, Area2D 等）は `EngineNode` の中に1箇所だけ存在する。
+  **`XxxData` にエンジン型を含めない**（二重管理を避けるため）
+
+### GameData バリアント設計
+
+親ノードの state にデータを持たせ、子ノードの state は識別タグにする:
+
+```flix
+pub enum GameData {
+    case XxxSprite(XxxScene.XxxData)  // 親ノード: データを保持
+    case XxxArea                       // 子ノード: 識別タグ（衝突判定で使用）
+    case Marker                        // その他の子: 汎用タグ
+}
+```
+
+**アンチパターン: エンジン型をレコードにまとめて GameData に持つ**
+
+```flix
+// NG: sprite が EngineNode と XxxNode の2箇所に存在し、毎フレーム同期が必要
+type alias XxxNode = { sprite = AnimatedSprite2D, area = Area2D }
+case Xxx(XxxNode, XxxData)
+```
 
 ## (B) 定数
 
 ```flix
 def name(): String = "xxx"
 def xxxPath(): NodePath = name() :: Nil
-def childName(): String = "child"
-def childPath(): NodePath = name() :: childName() :: Nil
+def areaName(): String = "area"
+def areaPath(): NodePath = name() :: areaName() :: Nil   // 非公開
 ```
 
 パスは `parentName :: childName :: Nil` 形式。定数関数で一元管理する。
+`areaPath()` 等の子ノードパスは非公開にし、`mapXxxArea` 経由でアクセスさせる。
 
 ## (C) 構築 — addXxx
 
-**原則: 親ノードが GameData を持ち、子は `GameData.Marker` または識別用バリアント。**
+**原則: 親ノードが `XxxSprite(XxxData)` を持ち、子は識別タグまたは `Marker`。**
 
 ```flix
 pub def addXxx(scene: Scene[GameData]): Scene[GameData] =
     let sprite = AnimatedSprite2D.make(animations, initialAnimation = "idle",
-        fps = 5.0, startPos, scale);
+        fps = 5.0, startPos, scale)
+        |> CanvasItem.hide;
     let area = Area2D.make(Vec2.zero(), collisionShape);
+    let xxxData = { velocity = Vec2.zero(), hp = 100 };
     scene
         |> Scene.addNode(name(),
             EngineNode.AnimSprite2DWithState(sprite,
-                GameData.XxxState(xxxNode, xxxData)))   // 親: 状態を持つ
-        |> Scene.addChild(name(), childName(),
-            EngineNode.Area2DWithState(area, GameData.Marker))  // 子: Marker
+                GameData.XxxSprite(xxxData)))           // 親: データを保持
+        |> Scene.addChild(name(), areaName(),
+            EngineNode.Area2DWithState(area,
+                GameData.XxxArea))                       // 子: 識別タグ
 ```
 
 動的スポーン（名前が実行時に決まる）の場合:
@@ -96,13 +118,15 @@ pub def ready(sprite: AnimatedSprite2D, data: XxxData
 
 pub def process(dt: Float64, sprite: AnimatedSprite2D,
                 data: XxxData): AnimatedSprite2D =
-    Node2D.setPosition(Vec2.add(Node2D.getPosition(sprite), Vec2.mul(data#velocity, dt)), sprite)
+    Node2D.setPosition(
+        Vec2.add(Node2D.getPosition(sprite), Vec2.mul(data#velocity, dt)),
+        sprite)
 
-// Node[GameData] instance 側
+// Node[GameData] instance 側（エンジン型は EngineNode の中だけ — 同期コード不要）
 redef ready(node, _path, scene) = match node {
-    case EngineNode.AnimSprite2DWithState(sprite, GameData.XxxState(n, data)) =>
+    case EngineNode.AnimSprite2DWithState(sprite, GameData.XxxSprite(data)) =>
         let (s, d) = XxxScene.ready(sprite, data);
-        (EngineNode.AnimSprite2DWithState(s, GameData.XxxState({ sprite = s | n }, d)), scene)
+        (EngineNode.AnimSprite2DWithState(s, GameData.XxxSprite(d)), scene)
     case _ => (node, scene)
 }
 ```
@@ -113,8 +137,8 @@ redef ready(node, _path, scene) = match node {
 // XxxScene 側
 pub def ready(path: NodePath, direction: Float64,
               scene: Scene[GameData]): Scene[GameData] \ Math.Random =
-    scene |> mapXxx(path, (node, data) ->
-        ({ body = RigidBody2D.setLinearVelocity(vel, node#body) | node }, data))
+    scene |> mapXxx(path, (body, data) ->
+        (RigidBody2D.setLinearVelocity(vel, body), data))
 
 // Node[GameData] instance 側
 redef ready(node, path, scene) = match node {
@@ -134,13 +158,23 @@ Node instance 側は `Scene.getEngineNode` で取り直す（foldNodes の上書
 
 ### その他のロジック
 
-`mapXxx` を使って scene を変換する:
+`mapXxxSprite` を使って scene を変換する:
 
 ```flix
 pub def applyInput(dir: Vec2.Vec2, scene: Scene[GameData]): Scene[GameData] =
-    scene |> mapXxx((node, data) ->
-        ({ sprite = updateAnimation(dir, node#sprite) | node },
+    scene |> mapXxxSprite((sprite, data) ->
+        (updateAnimation(dir, sprite),
          { velocity = computeVelocity(dir) | data }))
+```
+
+sprite と area の両方を操作する場合は `mapXxx` を使う:
+
+```flix
+pub def start(pos: Vec2.Vec2, scene: Scene[GameData]): Scene[GameData] =
+    scene |> mapXxx(
+        (sprite, data) ->
+            (sprite |> position(pos) |> show, { hit = false | data }),
+        Area2D.setMonitoring(true))
 ```
 
 単一ノードだけ操作する場合は `Scene.mapEngineNode` で十分:
@@ -151,62 +185,77 @@ pub def setText(text: String, scene: Scene[GameData]): Scene[GameData] =
         EngineNode.mapLabel2D(Label2D.setText(text)))
 ```
 
-## (E) extract / commit / map
+## (E) mapXxxSprite / mapXxxArea / mapXxx
 
-複数ノードを一括変換するための **3 関数セット**。
+コンポーネントごとに map 関数を用意し、合成で `mapXxx` を作る。
+
+```
+mapXxxSprite  ── sprite + XxxData を変換（親ノード操作）
+mapXxxArea    ── Area2D を変換（子ノード操作）
+mapXxx        ── mapXxxSprite >> mapXxxArea の合成
+```
 
 ```flix
-/// 変換の入口（公開）— 利用者はこれだけ使う
-pub def mapXxx(f: (XxxNode, XxxData) -> (XxxNode, XxxData),
-               scene: Scene[GameData]): Scene[GameData] =
-    let (node, data) = extractXxx(scene);
-    let (newNode, newData) = f(node, data);
-    commitXxx(newNode, newData, scene)
+/// 親ノードの sprite と XxxData を変換する
+pub def mapXxxSprite(f: (AnimatedSprite2D, XxxData) -> (AnimatedSprite2D, XxxData),
+                     scene: Scene[GameData]): Scene[GameData] =
+    Scene.mapEngineNode(xxxPath(), engineNode -> match engineNode {
+        case EngineNode.AnimSprite2DWithState(sprite, GameData.XxxSprite(data)) =>
+            let (newSprite, newData) = f(sprite, data);
+            EngineNode.AnimSprite2DWithState(newSprite, GameData.XxxSprite(newData))
+        case other => other
+    }, scene)
 
-/// 取り出し: forA で複数ノード取得 → match でアンラップ
-def extractXxx(scene: Scene[GameData]): (XxxNode, XxxData) =
-    let opt = forA(
-        sprite <- Scene.getEngineNode(xxxPath(), scene);
-        child  <- Scene.getEngineNode(childPath(), scene)
-    ) yield { sprite = sprite, child = child };
-    match opt {
-        case Some({ sprite = EngineNode.AnimSprite2DWithState(s, GameData.XxxState(_, data)),
-                    child = EngineNode.Area2DWithState(a, _) }) =>
-            ({ sprite = s, area = a }, data)
+/// 子ノードの Area2D を変換する
+pub def mapXxxArea(f: Area2D -> Area2D, scene: Scene[GameData]): Scene[GameData] =
+    Scene.mapEngineNode(areaPath(), EngineNode.mapArea2D(f), scene)
+
+/// sprite・XxxData・Area2D をまとめて変換する（mapXxxSprite と mapXxxArea の合成）
+pub def mapXxx(spriteF: (AnimatedSprite2D, XxxData) -> (AnimatedSprite2D, XxxData),
+               areaF: Area2D -> Area2D,
+               scene: Scene[GameData]): Scene[GameData] =
+    scene |> mapXxxSprite(spriteF) |> mapXxxArea(areaF)
+
+/// Scene から XxxData を取り出す
+pub def getXxxData(scene: Scene[GameData]): XxxData =
+    match Scene.getState(xxxPath(), scene) {
+        case Some(GameData.XxxSprite(data)) => data
         case _ => bug!("xxx not found")
     }
-
-/// 書き戻し: Scene.setEngineNode のパイプライン
-def commitXxx(node: XxxNode, data: XxxData,
-              scene: Scene[GameData]): Scene[GameData] =
-    scene
-        |> Scene.setEngineNode(xxxPath(),
-            EngineNode.AnimSprite2DWithState(node#sprite,
-                GameData.XxxState(node, data)))
-        |> Scene.setEngineNode(childPath(),
-            EngineNode.Area2DWithState(node#area, GameData.Marker))
 ```
 
-動的パス（実行時に名前が決まるノード）の場合は `path: NodePath` を引数に取る:
+### 設計の要点
+
+1. **エンジン型の正本は EngineNode の中だけ** — `mapXxxSprite` は `Scene.mapEngineNode` 経由で操作するため、
+   エンジン型のコピーが複数箇所に存在しない
+2. **子ノードのパスを公開しない** — `mapXxxArea` が `areaPath()` をカプセル化する
+3. **合成で拡張** — コンポーネントが増えたら `mapXxxNewChild` を追加し、`mapXxx` の合成に1段足すだけ
+
+### 動的パス（実行時に名前が決まるノード）の場合
+
+`path: NodePath` を引数に取る:
 
 ```flix
-pub def mapXxx(path: NodePath, f: ..., scene): Scene[GameData] =
-    let childPath = List.append(path, childName() :: Nil);
-    ...
+pub def mapXxxBody(path: NodePath,
+                   f: (RigidBody2D, XxxData) -> (RigidBody2D, XxxData),
+                   scene: Scene[GameData]): Scene[GameData] =
+    Scene.mapEngineNode(path, engineNode -> match engineNode {
+        case EngineNode.RigidBody2DWithState(body, GameData.XxxData(data)) =>
+            let (newBody, newData) = f(body, data);
+            EngineNode.RigidBody2DWithState(newBody, GameData.XxxData(newData))
+        case other => other
+    }, scene)
 ```
-
-**フィールド追加時の手順:**
-1. `extractXxx` — forA に 1 行、match パターンに 1 フィールド追加
-2. `commitXxx` — `Scene.setEngineNode` を 1 段追加
-3. `mapXxx` — 変更不要
 
 ## 使い分け早見表
 
 | やりたいこと | 手段 |
 |---|---|
-| 複数ノードを一括変換 | `mapXxx` (extract/commit/map) |
+| sprite + data を変換 | `mapXxxSprite` |
+| 子ノード（Area2D 等）を変換 | `mapXxxArea` |
+| sprite + data + 子ノードを一括変換 | `mapXxx`（合成） |
 | 単一ノードの見た目変更 | `Scene.mapEngineNode(path, f)` |
-| 状態のみ変更 | `Scene.setState(path, newState)` |
+| 状態のみ変更 | `Scene.setState(path, newState)` / `Scene.mapState(path, f)` |
 | ノード追加 | `Scene.addNode` / `Scene.addChild` |
 | ノード削除 | `Scene.removeAt(path)` / `Scene.removeGroup(group)` |
 | グループ一括削除 | `Scene.addToGroup` → `Scene.removeGroup` |

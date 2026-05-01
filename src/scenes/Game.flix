@@ -10,14 +10,14 @@ pub enum GamePhase with Eq {
 
 /// ゲーム固有の状態データ
 pub enum GameData {
-    case Player(PlayerScene.PlayerNode, PlayerScene.PlayerData)
+    case PlayerSprite(PlayerScene.PlayerData)
     case PlayerArea
     case MobData(Int32)
     case MobTimer(Int32)
     case StartTimer
     case ScoreTimer
     /// スコア値（score_label ノードに保持）
-    case Score(Int32)
+    case ScoreLabel(Int32)
     case StartButton
     case MessageTimer
     case TitleTimer
@@ -26,7 +26,6 @@ pub enum GameData {
 
 pub type alias GameState = {
     scene = Scene[GameData],
-    mobCounter = Int32,
     phase = GamePhase
 }
 
@@ -36,10 +35,10 @@ instance Node[GameData] {
     redef ready(node: EngineNode[GameData],
                 path: NodePath, scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) \ {GameEngine.Game, Math.Random} =
         match node {
-            case EngineNode.AnimSprite2DWithState(sprite, GameData.Player(playerNode, playerData)) =>
+            case EngineNode.AnimSprite2DWithState(sprite, GameData.PlayerSprite(playerData)) =>
                 let (readySprite, readyPlayerData) = PlayerScene.ready(sprite, playerData);
                 (EngineNode.AnimSprite2DWithState(readySprite,
-                    GameData.Player({ sprite = readySprite | playerNode }, readyPlayerData)), scene
+                    GameData.PlayerSprite(readyPlayerData)), scene
                 )
             case EngineNode.RigidBody2DWithState(_, GameData.MobData(_)) =>
                 let rot = Node2D.getRotation(node);
@@ -56,10 +55,10 @@ instance Node[GameData] {
     redef process(delta: Float64, node: EngineNode[GameData],
                     _path: NodePath, scene: Scene[GameData]): (EngineNode[GameData], Scene[GameData]) \ Math.Random =
         checked_ecast(match node {
-            case EngineNode.AnimSprite2DWithState(sprite, GameData.Player(playerNode, playerData)) =>
+            case EngineNode.AnimSprite2DWithState(sprite, GameData.PlayerSprite(playerData)) =>
                 let movedSprite = PlayerScene.process(delta, sprite, playerData);
                 (EngineNode.AnimSprite2DWithState(movedSprite,
-                    GameData.Player({ sprite = movedSprite | playerNode }, playerData))
+                    GameData.PlayerSprite(playerData))
                 , scene)
             case _ => (node, scene)
         })
@@ -72,10 +71,10 @@ instance AreaHandler[GameData] {
                           scene: Scene[GameData]): Scene[GameData] =
         match (selfState, otherState) {
             case (GameData.PlayerArea, GameData.MobData(_)) =>
-                scene |> PlayerScene.mapPlayer((playerNode, playerData) ->
-                    ({ sprite = CanvasItem.hide(playerNode#sprite),
-                       area = Area2D.setMonitoring(false, playerNode#area) },
-                     { hit = true | playerData }))
+                scene |> PlayerScene.mapPlayer(
+                    (sprite, playerData) ->
+                        (CanvasItem.hide(sprite), { hit = true | playerData }),
+                    Area2D.setMonitoring(false))
             case _ => scene
         }
 }
@@ -185,7 +184,6 @@ mod Game {
                 |> Scene.addNode(startTimerName(), EngineNode.TimerWithState(startTimer, GameData.StartTimer))
                 |> Scene.addNode(scoreTimerName(), EngineNode.TimerWithState(scoreTimer, GameData.ScoreTimer))
                 |> HUDScene.addHUD(fontAtlas),
-            mobCounter = 0,
             phase = GamePhase.Menu
         }
 
@@ -217,13 +215,13 @@ mod Game {
         let scene = state#scene
             |> Scene.removeGroup(MobScene.mobGroup())
             |> PlayerScene.start({x = 240.0, y = 450.0})
-            |> PlayerScene.mapPlayer((playerNode, playerData) ->
-                (playerNode, {velocity = Vec2.zero() | playerData}))
+            |> PlayerScene.mapPlayerSprite((sprite, playerData) ->
+                (sprite, {velocity = Vec2.zero() | playerData}))
             |> HUDScene.showMessage("Get Ready")
             |> HUDScene.updateScore(0)
             |> HUDScene.hideStartButton
             |> Scene.mapEngineNode(startTimerPath(), EngineNode.mapTimer(Timer.start));
-        { scene = scene, mobCounter = 0, phase = GamePhase.GetReady }
+        { scene = scene, phase = GamePhase.GetReady }
 
     /// Playing → GameOver: タイマー停止、GameOver メッセージ、MessageTimer 開始、BGM 停止 + 死亡 SE 再生
     pub def gameOver(state: GameState): GameState \ GameEngine.Audio =

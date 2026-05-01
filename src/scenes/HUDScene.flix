@@ -50,7 +50,7 @@ mod HUDScene {
             |> Scene.addNode(hudName(),
                 EngineNode.CanvasLayerWithState(hud, GameData.Marker))
             |> Scene.addChild(hudName(), scoreLabelName(),
-                EngineNode.Label2DWithState(scoreLabel, GameData.Score(0)))
+                EngineNode.Label2DWithState(scoreLabel, GameData.ScoreLabel(0)))
             |> Scene.addChild(hudName(), messageLabelName(),
                 EngineNode.Label2DWithState(messageLabel, GameData.Marker))
             |> Scene.addChild(hudName(), startButtonName(),
@@ -73,17 +73,17 @@ mod HUDScene {
     pub def hideMessage(scene: Scene[GameData]): Scene[GameData] =
         scene |> Scene.mapEngineNode(messageLabelPath(), en -> CanvasItem.setVisible(false, en))
 
-    /// score_label のテキストと Score 状態を更新する
+    /// score_label のテキストと ScoreLabel 状態を更新する
     pub def updateScore(score: Int32, scene: Scene[GameData]): Scene[GameData] =
         scene
             |> Scene.mapEngineNode(scoreLabelPath(),
                 EngineNode.mapLabel2D(Label2D.setText(Int32.toString(score))))
-            |> Scene.setState(scoreLabelPath(), GameData.Score(score))
+            |> Scene.setState(scoreLabelPath(), GameData.ScoreLabel(score))
 
     /// スコアを 1 加算し、ラベルを更新する（ScoreTimer タイムアウト時に呼ばれる）
     pub def incrementScore(scene: Scene[GameData]): Scene[GameData] =
         let current = match Scene.getState(scoreLabelPath(), scene) {
-            case Some(GameData.Score(s)) => s
+            case Some(GameData.ScoreLabel(s)) => s
             case _ => 0
         };
         updateScore(current + 1, scene)

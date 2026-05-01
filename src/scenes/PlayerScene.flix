@@ -9,8 +9,6 @@ mod PlayerScene {
     /// hit: モブに衝突したかどうか（Godot の hit シグナル相当）
     pub type alias PlayerData = {velocity = Vec2.Vec2, screenSize = Vec2.Vec2, hit = Bool}
 
-    pub type alias PlayerNode = { sprite = AnimatedSprite2D, area = Area2D }
-
     // ========================================================================
     // 定数
     // ========================================================================
@@ -59,13 +57,13 @@ mod PlayerScene {
             fps = 5.0,
             startPosition(),
             {x = 0.5, y = 0.5})
-            |> CanvasItem.setZIndex(10);
+            |> CanvasItem.setZIndex(10)
+            |> CanvasItem.hide;
         let area = Area2D.make(Vec2.zero(), playerCollisionShape());
-        let playerNode: PlayerNode = { sprite = sprite, area = area };
+        let playerData = {velocity = Vec2.zero(), screenSize = Vec2.zero(), hit = false};
         scene
             |> Scene.addNode(name(),
-                EngineNode.AnimSprite2DWithState(sprite,
-                    GameData.Player(playerNode, {velocity = Vec2.zero(), screenSize = Vec2.zero(), hit = false})))
+                EngineNode.AnimSprite2DWithState(sprite, GameData.PlayerSprite(playerData)))
             |> Scene.addChild(name(), areaName(),
                 EngineNode.Area2DWithState(area, GameData.PlayerArea))
             |> Scene.addChild(name(), "trail",
@@ -77,8 +75,6 @@ mod PlayerScene {
                         startScale = 0.5, endScale = 0.324
                     }) |> CanvasItem.setZIndex(-1),
                     GameData.Marker))
-            |> mapPlayer((pn, pd) ->
-                ({ sprite = CanvasItem.hide(pn#sprite) | pn }, pd))
 
     // ========================================================================
     // ready: ビューポートサイズ取得
@@ -110,10 +106,11 @@ mod PlayerScene {
     /// Godot の start(pos) を再現: 位置設定 + 回転リセット + show + 衝突再有効化
     /// trail は visible 伝播により親（player）の表示に自動追従する
     pub def start(pos: Vec2.Vec2, scene: Scene[GameData]): Scene[GameData] =
-        scene |> mapPlayer((playerNode, playerData) ->
-            ({ sprite = playerNode#sprite |> position(pos) |> rotation(0.0) |> show,
-               area = Area2D.setMonitoring(true, playerNode#area) },
-             { hit = false | playerData }))
+        scene |> mapPlayer(
+            (sprite, playerData) ->
+                (sprite |> position(pos) |> rotation(0.0) |> show,
+                 { hit = false | playerData }),
+            Area2D.setMonitoring(true))
 
     // ========================================================================
     // 入力適用
@@ -125,8 +122,8 @@ mod PlayerScene {
                 Vec2.mul(Vec2.normalized(dir), speed())
             else
                 Vec2.zero();
-        scene |> mapPlayer((playerNode, playerData) ->
-            ({ sprite = setPlayerAnimation(dir, playerNode#sprite) | playerNode },
+        scene |> mapPlayerSprite((sprite, playerData) ->
+            (setPlayerAnimation(dir, sprite),
              { velocity = velocity | playerData }))
 
     // ========================================================================
@@ -148,48 +145,34 @@ mod PlayerScene {
             AnimatedSprite2D.stop(sprite)
 
     // ========================================================================
-    // ボイラープレート: PlayerNode の取り出し・書き戻し・変換
+    // ヘルパー: sprite と PlayerData の変換・取得
     // ========================================================================
-    // XxxNode にフィールドを追加する場合:
-    //   1. extractXxx の forA に1行、yield と match パターンに1フィールド追加
-    //   2. commitXxx にパイプラインを1段追加して書き戻す
-    //   3. mapXxx は変更不要
 
-    /// PlayerNode と PlayerData を一括で変換する（sprite・area・データを同時に更新）
-    pub def mapPlayer(f: (PlayerNode, PlayerData) -> (PlayerNode, PlayerData),
+    /// プレイヤーの sprite と PlayerData を変換する
+    pub def mapPlayerSprite(f: (AnimatedSprite2D, PlayerData) -> (AnimatedSprite2D, PlayerData),
+                            scene: Scene[GameData]): Scene[GameData] =
+        Scene.mapEngineNode(playerPath(), engineNode -> match engineNode {
+            case EngineNode.AnimSprite2DWithState(sprite, GameData.PlayerSprite(playerData)) =>
+                let (newSprite, newPlayerData) = f(sprite, playerData);
+                EngineNode.AnimSprite2DWithState(newSprite, GameData.PlayerSprite(newPlayerData))
+            case other => other
+        }, scene)
+
+    /// プレイヤーの Area2D を変換する
+    pub def mapPlayerArea(f: Area2D -> Area2D, scene: Scene[GameData]): Scene[GameData] =
+        Scene.mapEngineNode(areaPath(), EngineNode.mapArea2D(f), scene)
+
+    /// プレイヤーの sprite・PlayerData・Area2D をまとめて変換する
+    pub def mapPlayer(spriteF: (AnimatedSprite2D, PlayerData) -> (AnimatedSprite2D, PlayerData),
+                      areaF: Area2D -> Area2D,
                       scene: Scene[GameData]): Scene[GameData] =
-        let (playerNode, playerData) = extractPlayer(scene);
-        let (newNode, newData) = f(playerNode, playerData);
-        commitPlayer(newNode, newData, scene)
+        scene |> mapPlayerSprite(spriteF) |> mapPlayerArea(areaF)
 
     /// Scene から PlayerData を取り出す
     pub def getPlayerData(scene: Scene[GameData]): PlayerData =
-        extractPlayer(scene) |> snd
-
-
-    /// シーンから XxxNode と XxxData を取り出す
-    /// フィールド追加時: forA に1行、yield と match パターンに1フィールド追加
-    def extractPlayer(scene: Scene[GameData]): (PlayerNode, PlayerData) =
-        let playerNodeOpt = forA(
-            sprite <- Scene.getEngineNode(playerPath(), scene);
-            area  <- Scene.getEngineNode(areaPath(), scene)
-        ) yield { sprite = sprite, area = area };
-        match playerNodeOpt {
-            case Some({ sprite = EngineNode.AnimSprite2DWithState(sprite, GameData.Player(_, playerData)),
-                        area = EngineNode.Area2DWithState(area, _) }) =>
-                ({ sprite = sprite, area = area }, playerData)
+        match Scene.getState(playerPath(), scene) {
+            case Some(GameData.PlayerSprite(playerData)) => playerData
             case _ => bug!("player not found")
         }
-
-    /// XxxNode と XxxData をシーンに書き戻す
-    /// フィールド追加時: パスと EngineNode バリアントの組を1段追加する
-    def commitPlayer(playerNode: PlayerNode, playerData: PlayerData,
-                     scene: Scene[GameData]): Scene[GameData] =
-        scene
-            |> Scene.setEngineNode(playerPath(),
-                EngineNode.AnimSprite2DWithState(playerNode#sprite,
-                    GameData.Player(playerNode, playerData)))
-            |> Scene.setEngineNode(areaPath(),
-                EngineNode.Area2DWithState(playerNode#area, GameData.PlayerArea))
 
 }
